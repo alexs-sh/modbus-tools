@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "core/frame",
+    "core/codec",
+    "tools/slave-rnd"
+]
+
+[profile.release]
+strip = "symbols"
+
