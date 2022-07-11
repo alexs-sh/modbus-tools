@@ -66,11 +66,10 @@ impl TcpClient {
                         self.start_request(request).await;
                     }
                     Some(Err(info)) => {
-                        error!("{} close.{:?}", self.address, info);
+                        error!("{} parser error: {:?}", self.address, info);
                         return false;
                     }
                     None => {
-                        info!("{} close", self.address);
                         return false;
                     }
                 }
@@ -95,6 +94,12 @@ impl TcpClient {
             request,
         };
         let _ = self.request_tx.send(request).await;
+    }
+}
+
+impl Drop for TcpClient {
+    fn drop(&mut self) {
+        info!("{} close", self.address);
     }
 }
 
