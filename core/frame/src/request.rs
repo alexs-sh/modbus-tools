@@ -140,4 +140,12 @@ impl RequestPDU {
             data: Data::registers(registers),
         }
     }
+
+    /// Raw
+    pub fn raw(func: u8, data: Data) -> RequestPDU {
+        RequestPDU::Raw {
+            function: func,
+            data,
+        }
+    }
 }

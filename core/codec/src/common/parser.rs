@@ -1,80 +1,89 @@
 extern crate frame;
 
-use crate::common::error::CodecError;
+use crate::common::error::Error;
 use frame::common;
 use frame::{
-    coils::CursorCoils, registers::CursorBe, request::RequestPDU, COIL_OFF, COIL_ON, MAX_NCOILS,
-    MAX_NREGS,
+    coils::CursorCoils, data::Data, registers::CursorBe, request::RequestPDU, COIL_OFF, COIL_ON,
+    MAX_DATA_SIZE, MAX_NCOILS, MAX_NREGS,
 };
 
 use byteorder::{BigEndian, ReadBytesExt};
 use bytes::Buf;
 use std::io::Cursor;
 
+//fn min_pdu_size
 pub(crate) fn parse_request(
     func: u8,
     src: &mut Cursor<&[u8]>,
-) -> Result<Option<RequestPDU>, CodecError> {
-    check_func(func)?;
-
-    let (v1, v2) = if let Some(prefix) = prefix_from_cursor(src) {
-        (prefix.0, prefix.1)
-    } else {
-        return Ok(None);
-    };
-
+) -> Result<Option<RequestPDU>, Error> {
     match func {
-        0x1 => {
+        0x1 => prefix_from_cursor(src).map_or(Ok(None), |(v1, v2)| {
             check_ncoils(v2)?;
             Ok(Some(RequestPDU::read_coils(v1, v2)))
-        }
-        0x2 => {
+        }),
+        0x2 => prefix_from_cursor(src).map_or(Ok(None), |(v1, v2)| {
             check_ncoils(v2)?;
             Ok(Some(RequestPDU::read_discrete_inputs(v1, v2)))
-        }
-        0x3 => Ok(Some(RequestPDU::read_holding_registers(v1, v2))),
-        0x4 => Ok(Some(RequestPDU::read_input_registers(v1, v2))),
-        0x5 => {
+        }),
+        0x3 => prefix_from_cursor(src).map_or(Ok(None), |(v1, v2)| {
+            Ok(Some(RequestPDU::read_holding_registers(v1, v2)))
+        }),
+        0x4 => prefix_from_cursor(src).map_or(Ok(None), |(v1, v2)| {
+            Ok(Some(RequestPDU::read_input_registers(v1, v2)))
+        }),
+        0x5 => prefix_from_cursor(src).map_or(Ok(None), |(v1, v2)| {
             let cmd = coil_cmd(v2)?;
             Ok(Some(RequestPDU::write_single_coil(v1, cmd)))
+        }),
+        0x6 => prefix_from_cursor(src).map_or(Ok(None), |(v1, v2)| {
+            Ok(Some(RequestPDU::write_single_register(v1, v2)))
+        }),
+        0xF => prefix_from_cursor(src).map_or(Ok(None), |(v1, v2)| {
+            src.read_u8().map_or(Ok(None), |nbytes| {
+                let address = v1;
+                let nobjs = v2;
+
+                check_ncoils(nobjs)?;
+                check_nbytes(common::ncoils_len(nobjs), nbytes as usize)?;
+
+                let nbytes = nbytes as usize;
+                if src.remaining() >= nbytes {
+                    Ok(Some(RequestPDU::write_multiple_coils(
+                        address,
+                        CursorCoils::new(src, nobjs),
+                    )))
+                } else {
+                    Ok(None)
+                }
+            })
+        }),
+
+        0x10 => prefix_from_cursor(src).map_or(Ok(None), |(v1, v2)| {
+            src.read_u8().map_or(Ok(None), |nbytes| {
+                let address = v1;
+                let nobjs = v2;
+
+                check_nregs(nobjs)?;
+                check_nbytes(common::nregs_len(nobjs), nbytes as usize)?;
+
+                let nbytes = nbytes as usize;
+                if src.remaining() >= nbytes {
+                    Ok(Some(RequestPDU::write_multiple_registers(
+                        address,
+                        CursorBe::new(src, nobjs),
+                    )))
+                } else {
+                    Ok(None)
+                }
+            })
+        }),
+
+        func => {
+            let min = std::cmp::min(src.remaining(), MAX_DATA_SIZE);
+            let mut data = Data::raw_empty(min);
+            src.copy_to_slice(data.get_mut());
+            Ok(Some(RequestPDU::raw(func, data)))
         }
-        0x6 => Ok(Some(RequestPDU::write_single_register(v1, v2))),
-        0xF => src.read_u8().map_or(Ok(None), |nbytes| {
-            let address = v1;
-            let nobjs = v2;
-
-            check_ncoils(nobjs)?;
-            check_nbytes(common::ncoils_len(nobjs), nbytes as usize)?;
-
-            let nbytes = nbytes as usize;
-            if src.remaining() >= nbytes {
-                Ok(Some(RequestPDU::write_multiple_coils(
-                    address,
-                    CursorCoils::new(src, nobjs),
-                )))
-            } else {
-                Ok(None)
-            }
-        }),
-
-        0x10 => src.read_u8().map_or(Ok(None), |nbytes| {
-            let address = v1;
-            let nobjs = v2;
-
-            check_nregs(nobjs)?;
-            check_nbytes(common::nregs_len(nobjs), nbytes as usize)?;
-
-            let nbytes = nbytes as usize;
-            if src.remaining() >= nbytes {
-                Ok(Some(RequestPDU::write_multiple_registers(
-                    address,
-                    CursorBe::new(src, nobjs),
-                )))
-            } else {
-                Ok(None)
-            }
-        }),
-        _ => unreachable!(),
     }
 }
 
@@ -88,45 +97,36 @@ fn prefix_from_cursor(src: &mut Cursor<&[u8]>) -> Option<(u16, u16)> {
     }
 }
 
-fn check_func(func: u8) -> Result<(), CodecError> {
-    let res = matches!(func, 0x1 | 0x2 | 0x3 | 0x4 | 0x5 | 0x6 | 0xF | 0x10);
-    if res {
-        Ok(())
-    } else {
-        Err(CodecError::UnsupportedFunction)
-    }
-}
-
-fn check_ncoils(nobjs: u16) -> Result<(), CodecError> {
+fn check_ncoils(nobjs: u16) -> Result<(), Error> {
     if nobjs > 0 && nobjs as usize <= MAX_NCOILS {
         Ok(())
     } else {
-        Err(CodecError::InvalidData)
+        Err(Error::InvalidData)
     }
 }
 
-fn check_nregs(nobjs: u16) -> Result<(), CodecError> {
+fn check_nregs(nobjs: u16) -> Result<(), Error> {
     if nobjs > 0 && nobjs as usize <= MAX_NREGS {
         Ok(())
     } else {
-        Err(CodecError::InvalidData)
+        Err(Error::InvalidData)
     }
 }
 
-fn check_nbytes(requested: usize, actual: usize) -> Result<(), CodecError> {
+fn check_nbytes(requested: usize, actual: usize) -> Result<(), Error> {
     if requested == actual {
         Ok(())
     } else {
-        Err(CodecError::InvalidData)
+        Err(Error::InvalidData)
     }
 }
 
-fn coil_cmd(value: u16) -> Result<bool, CodecError> {
+fn coil_cmd(value: u16) -> Result<bool, Error> {
     let valid = [COIL_ON, COIL_OFF].iter().any(|x| x == &value);
     if valid {
         Ok(value == COIL_ON)
     } else {
-        Err(CodecError::InvalidData)
+        Err(Error::InvalidData)
     }
 }
 
@@ -140,9 +140,17 @@ mod test {
         let mut cursor = Cursor::new(&input[..]);
         let func = cursor.read_u8().unwrap();
         let pdu = parse_request(func, &mut cursor);
-        assert!(pdu.is_err());
-        assert_eq!(pdu.err().unwrap(), CodecError::UnsupportedFunction);
-        assert_eq!(cursor.position(), 1);
+        assert!(pdu.is_ok());
+        match pdu {
+            Ok(Some(RequestPDU::Raw { function, data })) => {
+                assert_eq!(function, 0xF0);
+                assert_eq!(data.len(), 3);
+            }
+            msg => {
+                println!("{:?}", msg);
+                unreachable!()
+            }
+        }
     }
 
     #[test]
@@ -321,7 +329,7 @@ mod test {
         let pdu = parse_request(func, &mut cursor);
 
         assert!(pdu.is_err());
-        assert_eq!(pdu.err().unwrap(), CodecError::InvalidData);
+        assert_eq!(pdu.err().unwrap(), Error::InvalidData);
     }
 
     #[test]
@@ -333,7 +341,7 @@ mod test {
         let pdu = parse_request(func, &mut cursor);
 
         assert!(pdu.is_err());
-        assert_eq!(pdu.err().unwrap(), CodecError::InvalidData);
+        assert_eq!(pdu.err().unwrap(), Error::InvalidData);
     }
 
     #[test]
@@ -386,7 +394,7 @@ mod test {
         let pdu = parse_request(func, &mut cursor);
 
         assert!(pdu.is_err());
-        assert_eq!(pdu.err().unwrap(), CodecError::InvalidData);
+        assert_eq!(pdu.err().unwrap(), Error::InvalidData);
     }
 
     #[test]
@@ -400,7 +408,7 @@ mod test {
         let pdu = parse_request(func, &mut cursor);
 
         assert!(pdu.is_err());
-        assert_eq!(pdu.err().unwrap(), CodecError::InvalidData);
+        assert_eq!(pdu.err().unwrap(), Error::InvalidData);
     }
 
     #[test]

@@ -71,7 +71,7 @@ fn make_answer(request: &RequestFrame) -> ResponseFrame {
             ResponsePDU::write_multiple_registers(address, nobjs)
         }
 
-        _ => ResponsePDU::exception(0x1, Code::IllegalFunction),
+        RequestPDU::Raw { function, .. } => ResponsePDU::exception(function, Code::IllegalFunction),
     };
     ResponseFrame::rtu(slave, pdu)
 }
