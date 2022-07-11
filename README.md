@@ -1,6 +1,7 @@
 ## About
 
-Tool(s) for working with Modbus protocol.
+Tool(s) for working with Modbus protocol. They are written in Rust / Tokio /
+Async.
 
 [![Build Status](https://gitlab.com/alexssh/modbus-tools/badges/master/pipeline.svg)](https://gitlab.com/alexssh/modbus-tools/-/commits/master)
 [![Coverage](https://gitlab.com/alexssh/modbus-tools/badges/master/coverage.svg)](https://gitlab.com/alexssh/modbus-tools/-/commits/master)
@@ -13,11 +14,39 @@ Tool(s) for working with Modbus protocol.
 ### slave_rnd
 
 **slave_rnd** - the app that emulates the slave device and generates random
-answers to read requests and positively acknowledge on write commands. 
-
-Useful for fast check of Modbus masters like SCADA systems, custom client
+answers to read requests and positively acknowledge on write commands. Useful
+for fast check of Modbus masters like SCADA systems, custom client
 implementations, etc.
 
+![](docs/pics/mbpoll.gif)
+
+Supported functions: 
+
+- [x] 0x01 Read Coils
+- [x] 0x02 Read Discrete Inputs
+- [x] 0x03 Read Holding Registers
+- [x] 0x04 Read Input Registers
+- [x] 0x05 Write Single Coil
+- [x] 0x06 Write Single Register
+- [ ] 0x07 Read Exception Status
+- [ ] 0x08 Diagnostics
+- [ ] 0x0B Get Comm Event Counter
+- [ ] 0x0C Get Comm Event Log
+- [x] 0x0F Write Multiple Coils
+- [x] 0x10 Write Multiple registers
+- [ ] 0x11 Report Slave ID
+- [ ] 0x14 Read File Record
+- [ ] 0x15 Write File Record
+- [ ] 0x16 Mask Write Register
+- [ ] 0x17 Read/Write Multiple registers
+- [ ] 0x18 Read FIFO Queue
+- [ ] 0x2B Encapsulated Interface Transport
+
+Supported transport: 
+
+- [x] TCP
+- [ ] UDP
+- [ ] Serial
 
 #### Build & run
 
