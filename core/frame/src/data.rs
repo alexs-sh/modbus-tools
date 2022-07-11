@@ -14,6 +14,13 @@ impl Data {
         Data { buffer }
     }
 
+    pub fn raw_empty(size: usize) -> Data {
+        assert!(size <= MAX_DATA_SIZE);
+        let mut buffer = SmallVec::<[u8; MAX_DATA_SIZE]>::new();
+        buffer.resize(size, 0);
+        Data { buffer }
+    }
+
     pub fn coils(coils: impl CoilsStorage) -> Data {
         let nobjs = coils.coils_count();
         let mut data = Data::coils_empty(nobjs);

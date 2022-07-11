@@ -1,6 +1,6 @@
 extern crate frame;
 
-use crate::common::error::CodecError;
+use crate::common::error::Error;
 
 use frame::{data::Data, response::ResponsePDU, COIL_OFF, COIL_ON};
 
@@ -8,10 +8,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use bytes::Buf;
 use std::io::Cursor;
 
-pub(crate) fn pack_response(
-    src: &ResponsePDU,
-    dst: &mut Cursor<&mut [u8]>,
-) -> Result<(), CodecError> {
+pub(crate) fn pack_response(src: &ResponsePDU, dst: &mut Cursor<&mut [u8]>) -> Result<(), Error> {
     match src {
         ResponsePDU::ReadCoils { data, .. } => {
             check_capacity(data.len() + 2, dst)?;
@@ -80,9 +77,9 @@ pub(crate) fn pack_response(
     }
 }
 
-fn check_capacity(requested: usize, dst: &mut Cursor<&mut [u8]>) -> Result<(), CodecError> {
+fn check_capacity(requested: usize, dst: &mut Cursor<&mut [u8]>) -> Result<(), Error> {
     if requested > dst.remaining() {
-        Err(CodecError::BufferToSmall)
+        Err(Error::BufferToSmall)
     } else {
         Ok(())
     }

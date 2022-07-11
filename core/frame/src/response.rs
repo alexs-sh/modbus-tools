@@ -127,6 +127,14 @@ impl ResponsePDU {
         }
     }
 
+    /// raw
+    pub fn raw(func: u8, data: Data) -> ResponsePDU {
+        ResponsePDU::Raw {
+            function: func,
+            data,
+        }
+    }
+
     fn read_coils_inner(func: u8, coils: &[bool]) -> ResponsePDU {
         let nobjs = coils.len() as u16;
 
