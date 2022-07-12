@@ -1,3 +1,4 @@
+pub mod bytes;
 pub mod coils;
 pub mod common;
 pub mod data;

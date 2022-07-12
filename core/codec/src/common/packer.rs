@@ -73,6 +73,13 @@ pub(crate) fn pack_response(src: &ResponsePDU, dst: &mut Cursor<&mut [u8]>) -> R
             dst.write_u8((*code) as u8)?;
             Ok(())
         }
+        ResponsePDU::EncapsulatedInterfaceTransport { mei_type, data } => {
+            check_capacity(2 + data.len(), dst)?;
+            dst.write_u8(0x2b)?;
+            dst.write_u8(*mei_type)?;
+            write_bytes_data(data, dst);
+            Ok(())
+        }
         _ => unreachable!(),
     }
 }
@@ -96,6 +103,13 @@ fn write_regs_data(data: &Data, dst: &mut Cursor<&mut [u8]>) {
     for i in 0..regs {
         dst.write_u16::<BigEndian>(data.get_u16(i).unwrap())
             .unwrap();
+    }
+}
+
+fn write_bytes_data(data: &Data, dst: &mut Cursor<&mut [u8]>) {
+    let bytes = data.len();
+    for i in 0..bytes {
+        dst.write_u8(data.get_u8(i).unwrap()).unwrap();
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::{MAX_NCOILS, MAX_NREGS};
+use crate::{MAX_DATA_SIZE, MAX_NCOILS, MAX_NREGS};
 
 pub fn ncoils_len(nobjs: u16) -> usize {
     if nobjs > 0 {
@@ -18,6 +18,10 @@ pub fn ncoils_check(nobjs: u16) -> bool {
 
 pub fn nregs_check(nobjs: u16) -> bool {
     nobjs > 0 && nobjs as usize <= MAX_NREGS
+}
+
+pub fn data_bytes_check(nobjs: usize) -> bool {
+    nobjs > 0 && nobjs as usize <= MAX_DATA_SIZE
 }
 
 pub fn bits_from_bytes(bytes: &[u8], nbits: usize) -> Vec<bool> {
