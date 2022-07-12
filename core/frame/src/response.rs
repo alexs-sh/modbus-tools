@@ -71,7 +71,7 @@ impl ResponsePDU {
             | ResponsePDU::WriteMultipleCoils { .. }
             | ResponsePDU::WriteMultipleRegisters { .. } => 5,
             ResponsePDU::Raw { data, .. } => 1 + data.len(),
-            ResponsePDU::Exception { .. } => 3,
+            ResponsePDU::Exception { .. } => 2,
         }
     }
 }

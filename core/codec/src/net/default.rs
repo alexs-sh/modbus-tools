@@ -143,7 +143,9 @@ pub(crate) fn pack_header(header: &Header, dst: &mut Cursor<&mut [u8]>) -> Resul
 #[cfg(test)]
 mod test {
     use super::*;
+    use frame::exception::Code;
     use frame::request::RequestPDU;
+    use frame::response::{ResponseFrame, ResponsePDU};
 
     #[test]
     fn read_mbap_inv_proto() {
@@ -234,5 +236,17 @@ mod test {
             }
             _ => unreachable!(),
         };
+    }
+
+    #[test]
+    fn pack_exception() {
+        let control = [0x00, 0x01, 0x00, 0x00, 0x00, 0x03, 0x1, 0x83, 0x1];
+        let buffer = [0u8; 256];
+        let mut dst = BytesMut::from(&buffer[..]);
+        let pdu = frame::response::ResponsePDU::exception(0x3, Code::IllegalFunction);
+        let frame = ResponseFrame::net(0x1, 0x1, pdu);
+        let _ = ResponseEncoder::default().encode(frame, &mut dst).unwrap();
+        assert_eq!(dst.len(), 9);
+        assert_eq!(dst.as_ref(), control);
     }
 }
