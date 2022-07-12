@@ -76,8 +76,7 @@ impl Decoder for RequestDecoder {
         let needed = self.header.as_ref().map_or(0, |header| header.len - 1) as usize;
         if needed > 0 && needed <= src.len() {
             let mut cursor = Cursor::new(&src.as_ref()[0..needed]);
-            let func = cursor.read_u8().unwrap();
-            let pdu = parser::parse_request(func, &mut cursor)?;
+            let pdu = parser::parse_request(&mut cursor)?;
             if let Some(pdu) = pdu {
                 src.advance(needed);
                 let header = self.header.take().unwrap();

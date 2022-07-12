@@ -12,11 +12,8 @@ use bytes::Buf;
 use std::io::Cursor;
 
 //fn min_pdu_size
-pub(crate) fn parse_request(
-    func: u8,
-    src: &mut Cursor<&[u8]>,
-) -> Result<Option<RequestPDU>, Error> {
-    match func {
+pub(crate) fn parse_request(src: &mut Cursor<&[u8]>) -> Result<Option<RequestPDU>, Error> {
+    src.read_u8().map_or(Ok(None), |func| match func {
         0x1 => prefix_from_cursor(src).map_or(Ok(None), |(v1, v2)| {
             check_ncoils(v2)?;
             Ok(Some(RequestPDU::read_coils(v1, v2)))
@@ -96,7 +93,7 @@ pub(crate) fn parse_request(
             src.copy_to_slice(data.get_mut());
             Ok(Some(RequestPDU::raw(func, data)))
         }
-    }
+    })
 }
 
 fn prefix_from_cursor(src: &mut Cursor<&[u8]>) -> Option<(u16, u16)> {
@@ -150,8 +147,7 @@ mod test {
     fn parse_fc_unk() {
         let input = [0xF0, 0x00, 0x01, 0x0];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-        let pdu = parse_request(func, &mut cursor);
+        let pdu = parse_request(&mut cursor);
         assert!(pdu.is_ok());
         match pdu {
             Ok(Some(RequestPDU::Raw { function, data })) => {
@@ -168,8 +164,7 @@ mod test {
     fn parse_fc1_req() {
         let input = [0x1, 0x00, 0x01, 0x0, 0x10];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-        let pdu = parse_request(func, &mut cursor).unwrap().unwrap();
+        let pdu = parse_request(&mut cursor).unwrap().unwrap();
         let _ = match pdu {
             RequestPDU::ReadCoils { address, nobjs } => {
                 assert_eq!(address, 0x0001);
@@ -184,8 +179,7 @@ mod test {
     fn parse_fc1_req_short() {
         let input = [0x1, 0x00, 0x01, 0x0];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-        let pdu = parse_request(func, &mut cursor).unwrap();
+        let pdu = parse_request(&mut cursor).unwrap();
         assert_eq!(pdu, None);
     }
 
@@ -193,8 +187,7 @@ mod test {
     fn parse_fc2_req() {
         let input = [0x2, 0x01, 0x02, 0x0, 0x11];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-        let pdu = parse_request(func, &mut cursor).unwrap().unwrap();
+        let pdu = parse_request(&mut cursor).unwrap().unwrap();
         let _ = match pdu {
             RequestPDU::ReadDiscreteInputs { address, nobjs } => {
                 assert_eq!(address, 0x0102);
@@ -209,8 +202,7 @@ mod test {
     fn parse_fc3_req() {
         let input = [0x3, 0x00, 0x03, 0x0, 0x12];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-        let pdu = parse_request(func, &mut cursor).unwrap().unwrap();
+        let pdu = parse_request(&mut cursor).unwrap().unwrap();
         let _ = match pdu {
             RequestPDU::ReadHoldingRegisters { address, nobjs } => {
                 assert_eq!(address, 0x03);
@@ -225,9 +217,7 @@ mod test {
     fn parse_fc4_req() {
         let input = [0x4, 0x00, 0x04, 0x0, 0x13];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-
-        let pdu = parse_request(func, &mut cursor).unwrap().unwrap();
+        let pdu = parse_request(&mut cursor).unwrap().unwrap();
         let _ = match pdu {
             RequestPDU::ReadInputRegisters { address, nobjs } => {
                 assert_eq!(address, 0x04);
@@ -242,9 +232,7 @@ mod test {
     fn parse_fc5_req_on() {
         let input = [0x5, 0x00, 0x05, 0xFF, 0x00];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-
-        let pdu = parse_request(func, &mut cursor).unwrap().unwrap();
+        let pdu = parse_request(&mut cursor).unwrap().unwrap();
 
         let _ = match pdu {
             RequestPDU::WriteSingleCoil { address, value } => {
@@ -261,9 +249,7 @@ mod test {
         let input = [0x5, 0x00, 0x05, 0x00, 0x00];
 
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-
-        let pdu = parse_request(func, &mut cursor).unwrap().unwrap();
+        let pdu = parse_request(&mut cursor).unwrap().unwrap();
         let _ = match pdu {
             RequestPDU::WriteSingleCoil { address, value } => {
                 assert_eq!(address, 0x05);
@@ -278,9 +264,7 @@ mod test {
     fn parse_fc5_req_inv() {
         let input = [0x5, 0x00, 0x05, 0x00, 0x01];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-
-        let pdu = parse_request(func, &mut cursor);
+        let pdu = parse_request(&mut cursor);
         assert!(pdu.is_err());
     }
 
@@ -288,9 +272,7 @@ mod test {
     fn parse_fc6_req() {
         let input = [0x6, 0x00, 0x06, 0xFF, 0x00];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-
-        let pdu = parse_request(func, &mut cursor).unwrap().unwrap();
+        let pdu = parse_request(&mut cursor).unwrap().unwrap();
         let _ = match pdu {
             RequestPDU::WriteSingleRegister { address, value } => {
                 assert_eq!(address, 0x6);
@@ -309,9 +291,7 @@ mod test {
         ];
 
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-
-        let pdu = parse_request(func, &mut cursor).unwrap().unwrap();
+        let pdu = parse_request(&mut cursor).unwrap().unwrap();
 
         let _ = match pdu {
             RequestPDU::WriteMultipleCoils {
@@ -336,8 +316,7 @@ mod test {
         // invalid number of objects
         let input = [0xF, 0x00, 0x0F, 0x00, 0x20, 0x2, 0xCD, 0x01];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-        let pdu = parse_request(func, &mut cursor);
+        let pdu = parse_request(&mut cursor);
 
         assert!(pdu.is_err());
         assert_eq!(pdu.err().unwrap(), Error::InvalidData);
@@ -348,8 +327,7 @@ mod test {
         // invalid number of bytes
         let input = [0xF, 0x00, 0x0F, 0x00, 0xA, 0x1, 0xCD, 0x01];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-        let pdu = parse_request(func, &mut cursor);
+        let pdu = parse_request(&mut cursor);
 
         assert!(pdu.is_err());
         assert_eq!(pdu.err().unwrap(), Error::InvalidData);
@@ -360,8 +338,7 @@ mod test {
         // invalid number of bytes
         let input = [0xF, 0x00, 0x0F, 0x00, 0x1D, 0x4, 0xCD, 0x01];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-        let pdu = parse_request(func, &mut cursor);
+        let pdu = parse_request(&mut cursor);
 
         assert!(pdu.is_ok());
         assert_eq!(pdu.unwrap(), None);
@@ -372,9 +349,7 @@ mod test {
         let input = [0x10, 0x00, 0x10, 0x00, 0x2, 0x4, 0x00, 0xFF, 0xFF, 0x00];
         let values = [0x00FF, 0xFF00];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-
-        let pdu = parse_request(func, &mut cursor).unwrap().unwrap();
+        let pdu = parse_request(&mut cursor).unwrap().unwrap();
 
         let _ = match pdu {
             RequestPDU::WriteMultipleRegisters {
@@ -400,9 +375,7 @@ mod test {
         let input = [0x10, 0x00, 0x10, 0x00, 0x2, 0x3, 0x00, 0xFF, 0xFF, 0x00];
 
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-
-        let pdu = parse_request(func, &mut cursor);
+        let pdu = parse_request(&mut cursor);
 
         assert!(pdu.is_err());
         assert_eq!(pdu.err().unwrap(), Error::InvalidData);
@@ -414,9 +387,7 @@ mod test {
         let input = [0x10, 0x00, 0x10, 0x00, 0x1, 0x4, 0x00, 0xFF, 0xFF, 0x00];
 
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-
-        let pdu = parse_request(func, &mut cursor);
+        let pdu = parse_request(&mut cursor);
 
         assert!(pdu.is_err());
         assert_eq!(pdu.err().unwrap(), Error::InvalidData);
@@ -427,9 +398,7 @@ mod test {
         // partial message
         let input = [0x10, 0x00, 0x10, 0x00, 0x3, 0x6, 0x00, 0xFF, 0xFF, 0x00];
         let mut cursor = Cursor::new(&input[..]);
-        let func = cursor.read_u8().unwrap();
-
-        let pdu = parse_request(func, &mut cursor);
+        let pdu = parse_request(&mut cursor);
 
         assert!(pdu.is_ok());
         assert_eq!(pdu.unwrap(), None);
