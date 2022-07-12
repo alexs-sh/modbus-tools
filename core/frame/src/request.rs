@@ -1,5 +1,7 @@
 use super::data::Data;
-use super::{bytes::BytesStorage, coils::CoilsStorage, common, registers::RegisterStorage};
+use super::{
+    bytes::BytesStorage, coils::CoilsStorage, common, header::Header, registers::RegisterStorage,
+};
 
 #[derive(Debug, PartialEq)]
 pub enum RequestPDU {
@@ -86,6 +88,14 @@ impl RequestFrame {
         RequestFrame {
             id: Some(id),
             slave,
+            pdu,
+        }
+    }
+
+    pub fn net_parts(header: Header, pdu: RequestPDU) -> RequestFrame {
+        RequestFrame {
+            id: Some(header.id),
+            slave: header.slave,
             pdu,
         }
     }
