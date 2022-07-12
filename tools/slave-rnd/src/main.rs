@@ -31,47 +31,62 @@ fn make_answer(request: &RequestFrame) -> ResponseFrame {
     let mut registers = [0u16; MAX_NREGS];
     let mut coils = [false; MAX_NCOILS];
 
-    let pdu = match request.pdu {
+    let pdu = match &request.pdu {
         RequestPDU::ReadCoils { nobjs, .. } => {
-            let nobjs = nobjs as usize;
+            let nobjs = *nobjs as usize;
             fill_coils(&mut coils[0..nobjs]);
             ResponsePDU::read_coils(&coils[0..nobjs])
         }
 
         RequestPDU::ReadDiscreteInputs { nobjs, .. } => {
-            let nobjs = nobjs as usize;
+            let nobjs = *nobjs as usize;
             fill_coils(&mut coils[0..nobjs]);
             ResponsePDU::read_discrete_inputs(&coils[0..nobjs as usize])
         }
 
         RequestPDU::ReadHoldingRegisters { nobjs, .. } => {
-            let nobjs = nobjs as usize;
+            let nobjs = *nobjs as usize;
             fill_registers(&mut registers[0..nobjs]);
             ResponsePDU::read_holding_registers(&registers[0..nobjs])
         }
 
         RequestPDU::ReadInputRegisters { nobjs, .. } => {
-            let nobjs = nobjs as usize;
+            let nobjs = *nobjs as usize;
             fill_registers(&mut registers[0..nobjs]);
             ResponsePDU::read_input_registers(&registers[0..nobjs as usize])
         }
 
         RequestPDU::WriteSingleCoil { address, value } => {
-            ResponsePDU::write_single_coil(address, value)
+            ResponsePDU::write_single_coil(*address, *value)
         }
 
         RequestPDU::WriteSingleRegister { address, value } => {
-            ResponsePDU::write_single_register(address, value)
+            ResponsePDU::write_single_register(*address, *value)
         }
 
         RequestPDU::WriteMultipleCoils { address, nobjs, .. } => {
-            ResponsePDU::write_multiple_coils(address, nobjs)
-        }
-        RequestPDU::WriteMultipleRegisters { address, nobjs, .. } => {
-            ResponsePDU::write_multiple_registers(address, nobjs)
+            ResponsePDU::write_multiple_coils(*address, *nobjs)
         }
 
-        RequestPDU::Raw { function, .. } => ResponsePDU::exception(function, Code::IllegalFunction),
+        RequestPDU::WriteMultipleRegisters { address, nobjs, .. } => {
+            ResponsePDU::write_multiple_registers(*address, *nobjs)
+        }
+
+        RequestPDU::EncapsulatedInterfaceTransport { mei_type, data, .. } => {
+            match (mei_type, data.get_u8(0)) {
+                (0xE, Some(0) | Some(1) | Some(2)) => {
+                    ResponsePDU::encapsulated_interface_transport(
+                        *mei_type,
+                        "modbus-imit".as_bytes(),
+                    )
+                }
+                _ => ResponsePDU::exception(0x2b, Code::IllegalDataValue),
+            }
+        }
+
+        RequestPDU::Raw { function, .. } => {
+            ResponsePDU::exception(*function, Code::IllegalFunction)
+        }
     };
     ResponseFrame::rtu(slave, pdu)
 }

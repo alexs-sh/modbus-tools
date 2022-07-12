@@ -239,11 +239,42 @@ mod test {
     }
 
     #[test]
+    fn decode_0x2b() {
+        let input = [0x00, 0x01, 0x00, 0x00, 0x00, 0x04, 0x11, 0x2B, 0x0E, 0x1];
+
+        let mut bytes = BytesMut::from(&input[..]);
+        let mut decoder = RequestDecoder::default();
+        let message = decoder.decode(&mut bytes).unwrap().unwrap();
+        assert_eq!(message.slave, 0x11);
+        assert_eq!(message.id.unwrap(), 0x01);
+        match message.pdu {
+            RequestPDU::EncapsulatedInterfaceTransport { mei_type, data } => {
+                assert_eq!(mei_type, 0xE);
+                assert_eq!(data.get_u8(0).unwrap(), 0x1);
+            }
+            _ => unreachable!(),
+        };
+    }
+
+    #[test]
+    fn encode_0x2b() {
+        let control = [
+            0x00, 0x03, 0x00, 0x00, 0x00, 0x06, 0x02, 0x2B, 0x0E, 0x31, 0x31, 0x31,
+        ];
+        let mut buffer = BytesMut::with_capacity(256);
+        let mut encoder = ResponseEncoder::default();
+        let pdu = ResponsePDU::encapsulated_interface_transport(0xE, "111".as_bytes());
+        let frame = ResponseFrame::net(0x3, 0x2, pdu);
+        let _ = encoder.encode(frame, &mut buffer).unwrap();
+        assert_eq!(control, buffer.as_ref());
+    }
+
+    #[test]
     fn pack_exception() {
         let control = [0x00, 0x01, 0x00, 0x00, 0x00, 0x03, 0x1, 0x83, 0x1];
         let buffer = [0u8; 256];
         let mut dst = BytesMut::from(&buffer[..]);
-        let pdu = frame::response::ResponsePDU::exception(0x3, Code::IllegalFunction);
+        let pdu = ResponsePDU::exception(0x3, Code::IllegalFunction);
         let frame = ResponseFrame::net(0x1, 0x1, pdu);
         let _ = ResponseEncoder::default().encode(frame, &mut dst).unwrap();
         assert_eq!(dst.len(), 9);

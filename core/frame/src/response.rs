@@ -3,34 +3,69 @@ use super::{common, data::Data, exception::Code};
 #[derive(Debug, PartialEq)]
 pub enum ResponsePDU {
     /// 0x1
-    ReadCoils { nobjs: u16, data: Data },
+    ReadCoils {
+        nobjs: u16,
+        data: Data,
+    },
 
     /// 0x2
-    ReadDiscreteInputs { nobjs: u16, data: Data },
+    ReadDiscreteInputs {
+        nobjs: u16,
+        data: Data,
+    },
 
     /// 0x3
-    ReadHoldingRegisters { nobjs: u16, data: Data },
+    ReadHoldingRegisters {
+        nobjs: u16,
+        data: Data,
+    },
 
     /// 0x4
-    ReadInputRegisters { nobjs: u16, data: Data },
+    ReadInputRegisters {
+        nobjs: u16,
+        data: Data,
+    },
 
     /// 0x5
-    WriteSingleCoil { address: u16, value: bool },
+    WriteSingleCoil {
+        address: u16,
+        value: bool,
+    },
 
     /// 0x6
-    WriteSingleRegister { address: u16, value: u16 },
+    WriteSingleRegister {
+        address: u16,
+        value: u16,
+    },
 
     /// 0xF
-    WriteMultipleCoils { address: u16, nobjs: u16 },
+    WriteMultipleCoils {
+        address: u16,
+        nobjs: u16,
+    },
 
     /// 0x10
-    WriteMultipleRegisters { address: u16, nobjs: u16 },
+    WriteMultipleRegisters {
+        address: u16,
+        nobjs: u16,
+    },
 
-    /// Another functino code or not parsed PDU
-    Raw { function: u8, data: Data },
+    /// 0x2b
+    EncapsulatedInterfaceTransport {
+        mei_type: u8,
+        data: Data,
+    },
+
+    Raw {
+        function: u8,
+        data: Data,
+    },
 
     /// Exception,
-    Exception { function: u8, code: Code },
+    Exception {
+        function: u8,
+        code: Code,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -70,6 +105,7 @@ impl ResponsePDU {
             | ResponsePDU::WriteSingleRegister { .. }
             | ResponsePDU::WriteMultipleCoils { .. }
             | ResponsePDU::WriteMultipleRegisters { .. } => 5,
+            ResponsePDU::EncapsulatedInterfaceTransport { data, .. } => 2 + data.len(),
             ResponsePDU::Raw { data, .. } => 1 + data.len(),
             ResponsePDU::Exception { .. } => 2,
         }
@@ -117,6 +153,15 @@ impl ResponsePDU {
     pub fn write_multiple_registers(address: u16, nobjs: u16) -> ResponsePDU {
         assert!(common::nregs_check(nobjs));
         ResponsePDU::WriteMultipleRegisters { address, nobjs }
+    }
+
+    /// 0x2b
+    pub fn encapsulated_interface_transport(mei_type: u8, data: &[u8]) -> ResponsePDU {
+        assert!(common::data_bytes_check(data.len()));
+        ResponsePDU::EncapsulatedInterfaceTransport {
+            mei_type,
+            data: Data::raw(data),
+        }
     }
 
     /// make response with exception

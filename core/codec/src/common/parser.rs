@@ -3,8 +3,8 @@ extern crate frame;
 use crate::common::error::Error;
 use frame::common;
 use frame::{
-    coils::CursorCoils, data::Data, registers::CursorBe, request::RequestPDU, COIL_OFF, COIL_ON,
-    MAX_DATA_SIZE, MAX_NCOILS, MAX_NREGS,
+    bytes::CursorBytes, coils::CursorCoils, data::Data, registers::CursorBe, request::RequestPDU,
+    COIL_OFF, COIL_ON, MAX_DATA_SIZE, MAX_NCOILS, MAX_NREGS,
 };
 
 use byteorder::{BigEndian, ReadBytesExt};
@@ -78,6 +78,18 @@ pub(crate) fn parse_request(
             })
         }),
 
+        0x2b => src.read_u8().map_or(Ok(None), |mei_type| match mei_type {
+            0xE => Ok(Some(RequestPDU::encapsulated_interface_transport(
+                mei_type,
+                CursorBytes::new(src, 1),
+            ))),
+            0xD => Ok(Some(RequestPDU::encapsulated_interface_transport(
+                mei_type,
+                CursorBytes::new(src, src.remaining() as u16),
+            ))),
+            _ => Err(Error::InvalidData),
+        }),
+
         func => {
             let min = std::cmp::min(src.remaining(), MAX_DATA_SIZE);
             let mut data = Data::raw_empty(min);
@@ -146,8 +158,7 @@ mod test {
                 assert_eq!(function, 0xF0);
                 assert_eq!(data.len(), 3);
             }
-            msg => {
-                println!("{:?}", msg);
+            _ => {
                 unreachable!()
             }
         }

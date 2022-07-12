@@ -1,5 +1,5 @@
 use super::data::Data;
-use super::{coils::CoilsStorage, common, registers::RegisterStorage};
+use super::{bytes::BytesStorage, coils::CoilsStorage, common, registers::RegisterStorage};
 
 #[derive(Debug, PartialEq)]
 pub enum RequestPDU {
@@ -52,6 +52,13 @@ pub enum RequestPDU {
         nobjs: u16,
         data: Data,
     },
+
+    /// 0x2b
+    EncapsulatedInterfaceTransport {
+        mei_type: u8,
+        data: Data,
+    },
+
     Raw {
         function: u8,
         data: Data,
@@ -139,6 +146,18 @@ impl RequestPDU {
             nobjs,
             data: Data::registers(registers),
         }
+    }
+
+    /// 0x2b
+    pub fn encapsulated_interface_transport(mei_type: u8, bytes: impl BytesStorage) -> RequestPDU {
+        let len = bytes.bytes_count() as usize;
+
+        assert!(common::data_bytes_check(len));
+
+        let mut data = Data::raw_empty(len);
+        bytes.bytes_write(data.get_mut());
+
+        RequestPDU::EncapsulatedInterfaceTransport { mei_type, data }
     }
 
     /// Raw
