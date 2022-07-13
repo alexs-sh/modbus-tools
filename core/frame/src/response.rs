@@ -1,4 +1,4 @@
-use super::{common, data::Data, exception::Code};
+use super::{coils::Coils, common, data::Data, exception::Code, registers::Registers};
 
 #[derive(Debug, PartialEq)]
 pub enum ResponsePDU {
@@ -114,22 +114,22 @@ impl ResponsePDU {
 
 impl ResponsePDU {
     /// 0x1
-    pub fn read_coils(coils: &[bool]) -> ResponsePDU {
+    pub fn read_coils(coils: impl Coils) -> ResponsePDU {
         ResponsePDU::read_coils_inner(1, coils)
     }
 
     /// 0x2
-    pub fn read_discrete_inputs(coils: &[bool]) -> ResponsePDU {
+    pub fn read_discrete_inputs(coils: impl Coils) -> ResponsePDU {
         ResponsePDU::read_coils_inner(2, coils)
     }
 
     /// 0x3
-    pub fn read_holding_registers(registers: &[u16]) -> ResponsePDU {
+    pub fn read_holding_registers(registers: impl Registers) -> ResponsePDU {
         ResponsePDU::read_registers_inner(3, registers)
     }
 
     /// 0x4
-    pub fn read_input_registers(registers: &[u16]) -> ResponsePDU {
+    pub fn read_input_registers(registers: impl Registers) -> ResponsePDU {
         ResponsePDU::read_registers_inner(4, registers)
     }
 
@@ -180,8 +180,8 @@ impl ResponsePDU {
         }
     }
 
-    fn read_coils_inner(func: u8, coils: &[bool]) -> ResponsePDU {
-        let nobjs = coils.len() as u16;
+    fn read_coils_inner(func: u8, coils: impl Coils) -> ResponsePDU {
+        let nobjs = coils.coils_count();
 
         assert!(common::ncoils_check(nobjs));
         assert!(func == 0x1 || func == 0x2);
@@ -199,8 +199,8 @@ impl ResponsePDU {
         }
     }
 
-    fn read_registers_inner(func: u8, registers: &[u16]) -> ResponsePDU {
-        let nobjs = registers.len() as u16;
+    fn read_registers_inner(func: u8, registers: impl Registers) -> ResponsePDU {
+        let nobjs = registers.registers_count();
         assert!(common::nregs_check(nobjs));
         assert!(func == 0x3 || func == 0x4);
 
@@ -228,7 +228,7 @@ mod test {
         let nbits = 37;
         let bytes = [0xCD, 0x6B, 0xB2, 0x0E, 0x1B];
         let bits = common::bits_from_bytes(&bytes, nbits);
-        let frame = ResponseFrame::rtu(0x11, ResponsePDU::read_coils(&bits));
+        let frame = ResponseFrame::rtu(0x11, ResponsePDU::read_coils(bits.as_slice()));
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
             ResponsePDU::ReadCoils { nobjs, data } => {
@@ -249,7 +249,7 @@ mod test {
         let nbits = 37;
         let bytes = [0xCD, 0x6B, 0xB2, 0x0E, 0x1B];
         let bits = common::bits_from_bytes(&bytes, nbits);
-        let frame = ResponseFrame::rtu(0x11, ResponsePDU::read_coils(&bits));
+        let frame = ResponseFrame::rtu(0x11, ResponsePDU::read_coils(bits.as_slice()));
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
             ResponsePDU::ReadCoils { nobjs, data } => {
@@ -270,7 +270,7 @@ mod test {
         let nbits = 37;
         let bytes = [0xCD, 0x6B, 0xB2, 0x0E, 0x1B];
         let bits = common::bits_from_bytes(&bytes, nbits);
-        let frame = ResponseFrame::rtu(0x11, ResponsePDU::read_discrete_inputs(&bits));
+        let frame = ResponseFrame::rtu(0x11, ResponsePDU::read_discrete_inputs(bits.as_slice()));
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
             ResponsePDU::ReadDiscreteInputs { nobjs, data } => {
@@ -288,8 +288,11 @@ mod test {
 
     #[test]
     fn build_fc3_response() {
-        let registers = [1, 2, 0xFFFF];
-        let frame = ResponseFrame::rtu(0x11, ResponsePDU::read_holding_registers(&registers));
+        let registers = [1u16, 2, 0xFFFF];
+        let frame = ResponseFrame::rtu(
+            0x11,
+            ResponsePDU::read_holding_registers(registers.as_slice()),
+        );
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
             ResponsePDU::ReadHoldingRegisters { nobjs, data } => {
@@ -305,8 +308,11 @@ mod test {
 
     #[test]
     fn build_fc4_response() {
-        let registers = [1, 2, 3, 0xFFFF];
-        let frame = ResponseFrame::rtu(0x11, ResponsePDU::read_input_registers(&registers));
+        let registers = [1u16, 2, 3, 0xFFFF];
+        let frame = ResponseFrame::rtu(
+            0x11,
+            ResponsePDU::read_input_registers(registers.as_slice()),
+        );
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
             ResponsePDU::ReadInputRegisters { nobjs, data } => {

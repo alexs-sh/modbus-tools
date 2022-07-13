@@ -4,7 +4,7 @@ use bytes::Buf;
 use std::cell::RefCell;
 use std::io::Cursor;
 
-pub trait RegisterStorage {
+pub trait Registers {
     /// write registers to a buffer
     /// return number of written registers
     fn registers_write(&self, dst: &mut [u8]) -> u16;
@@ -13,7 +13,7 @@ pub trait RegisterStorage {
     fn registers_count(&self) -> u16;
 }
 
-impl RegisterStorage for &[u8] {
+impl Registers for &[u8] {
     fn registers_write(&self, dst: &mut [u8]) -> u16 {
         let slen = self.len();
         let dlen = dst.len();
@@ -34,7 +34,7 @@ impl RegisterStorage for &[u8] {
     }
 }
 
-impl RegisterStorage for &[u16] {
+impl Registers for &[u16] {
     fn registers_write(&self, dst: &mut [u8]) -> u16 {
         let slen = self.len() * 2;
         let dlen = dst.len();
@@ -68,7 +68,7 @@ impl<'a, 'b> CursorBe<'a, 'b> {
     }
 }
 
-impl<'a, 'b> RegisterStorage for CursorBe<'a, 'b> {
+impl<'a, 'b> Registers for CursorBe<'a, 'b> {
     fn registers_write(&self, dst: &mut [u8]) -> u16 {
         let slen = common::nregs_len(self.nobjs as u16);
         let dlen = dst.len();

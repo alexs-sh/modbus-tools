@@ -4,7 +4,7 @@ use bytes::Buf;
 use std::cell::RefCell;
 use std::io::Cursor;
 
-pub trait CoilsStorage {
+pub trait Coils {
     /// write coils to a buffer
     /// return number of written coils
     fn coils_write(&self, dst: &mut [u8]) -> u16;
@@ -13,7 +13,7 @@ pub trait CoilsStorage {
     fn coils_count(&self) -> u16;
 }
 
-impl CoilsStorage for &[bool] {
+impl Coils for &[bool] {
     fn coils_write(&self, dst: &mut [u8]) -> u16 {
         let nbits = std::cmp::min(self.len(), dst.len() * 8) as u16;
         let len = common::ncoils_len(nbits);
@@ -50,7 +50,7 @@ impl<'a> CoilsSlice<'a> {
     }
 }
 
-impl<'a> CoilsStorage for CoilsSlice<'a> {
+impl<'a> Coils for CoilsSlice<'a> {
     fn coils_write(&self, dst: &mut [u8]) -> u16 {
         let slen = common::ncoils_len(self.nobjs);
         let dlen = dst.len();
@@ -80,7 +80,7 @@ impl<'a, 'b> CursorCoils<'a, 'b> {
     }
 }
 
-impl<'a, 'b> CoilsStorage for CursorCoils<'a, 'b> {
+impl<'a, 'b> Coils for CursorCoils<'a, 'b> {
     fn coils_write(&self, dst: &mut [u8]) -> u16 {
         let slen = common::ncoils_len(self.nobjs);
         let dlen = dst.len();

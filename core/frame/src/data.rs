@@ -1,4 +1,4 @@
-use super::{coils::CoilsStorage, common, registers::RegisterStorage, MAX_DATA_SIZE};
+use super::{coils::Coils, common, registers::Registers, MAX_DATA_SIZE};
 
 use smallvec::SmallVec;
 
@@ -21,7 +21,7 @@ impl Data {
         Data { buffer }
     }
 
-    pub fn coils(coils: impl CoilsStorage) -> Data {
+    pub fn coils(coils: impl Coils) -> Data {
         let nobjs = coils.coils_count();
         let mut data = Data::coils_empty(nobjs);
         let written = coils.coils_write(data.get_mut());
@@ -29,7 +29,7 @@ impl Data {
         data
     }
 
-    pub fn registers(registers: impl RegisterStorage) -> Data {
+    pub fn registers(registers: impl Registers) -> Data {
         let nobjs = registers.registers_count();
         let mut data = Data::registers_empty(nobjs);
         let written = registers.registers_write(data.get_mut());

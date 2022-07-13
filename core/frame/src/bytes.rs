@@ -4,7 +4,7 @@ use bytes::Buf;
 use std::cell::RefCell;
 use std::io::Cursor;
 
-pub trait BytesStorage {
+pub trait Bytes {
     /// write registers to a buffer
     /// return number of written registers
     fn bytes_write(&self, dst: &mut [u8]) -> u16;
@@ -13,7 +13,7 @@ pub trait BytesStorage {
     fn bytes_count(&self) -> u16;
 }
 
-impl BytesStorage for &[u8] {
+impl Bytes for &[u8] {
     fn bytes_write(&self, dst: &mut [u8]) -> u16 {
         let len = std::cmp::min(self.len(), dst.len());
         dst[..len].copy_from_slice(&self[..len]);
@@ -40,7 +40,7 @@ impl<'a, 'b> CursorBytes<'a, 'b> {
     }
 }
 
-impl<'a, 'b> BytesStorage for CursorBytes<'a, 'b> {
+impl<'a, 'b> Bytes for CursorBytes<'a, 'b> {
     fn bytes_write(&self, dst: &mut [u8]) -> u16 {
         let slen = self.nobjs as usize;
         let dlen = dst.len();
@@ -69,7 +69,7 @@ mod test {
     fn test_with_u8() {
         let input = [1u8, 2, 3, 4];
         let mut output = [0u8; 4];
-        let bs: &dyn BytesStorage = &input.as_slice();
+        let bs: &dyn Bytes = &input.as_slice();
         assert_eq!(bs.bytes_count(), 4);
         let res = bs.bytes_write(&mut output[..]);
         assert_eq!(res, 4);

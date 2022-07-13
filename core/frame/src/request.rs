@@ -1,7 +1,5 @@
 use super::data::Data;
-use super::{
-    bytes::BytesStorage, coils::CoilsStorage, common, header::Header, registers::RegisterStorage,
-};
+use super::{bytes::Bytes, coils::Coils, common, header::Header, registers::Registers};
 
 #[derive(Debug, PartialEq)]
 pub enum RequestPDU {
@@ -137,7 +135,7 @@ impl RequestPDU {
     }
 
     /// 0xF
-    pub fn write_multiple_coils(address: u16, coils: impl CoilsStorage) -> RequestPDU {
+    pub fn write_multiple_coils(address: u16, coils: impl Coils) -> RequestPDU {
         let nobjs = coils.coils_count();
         assert!(common::ncoils_check(nobjs));
         RequestPDU::WriteMultipleCoils {
@@ -148,7 +146,7 @@ impl RequestPDU {
     }
 
     /// 0x10
-    pub fn write_multiple_registers(address: u16, registers: impl RegisterStorage) -> RequestPDU {
+    pub fn write_multiple_registers(address: u16, registers: impl Registers) -> RequestPDU {
         let nobjs = registers.registers_count() as u16;
         assert!(common::nregs_check(nobjs));
         RequestPDU::WriteMultipleRegisters {
@@ -159,7 +157,7 @@ impl RequestPDU {
     }
 
     /// 0x2b
-    pub fn encapsulated_interface_transport(mei_type: u8, bytes: impl BytesStorage) -> RequestPDU {
+    pub fn encapsulated_interface_transport(mei_type: u8, bytes: impl Bytes) -> RequestPDU {
         let len = bytes.bytes_count() as usize;
 
         assert!(common::data_bytes_check(len));

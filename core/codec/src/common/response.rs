@@ -141,7 +141,7 @@ mod test {
         let payload = [0xCDu8, 0x6B, 0xB2, 0x0E, 0x1B];
         let control = [0x01u8, 0x05, 0xCD, 0x6B, 0xB2, 0x0E, 0x1B];
         let bits = common::bits_from_bytes(&payload, 37);
-        let pdu = ResponsePDU::read_coils(&bits);
+        let pdu = ResponsePDU::read_coils(bits.as_slice());
         let mut buffer = BytesMut::new();
         buffer.resize(control.len(), 0);
         Codec::default().encode(pdu, &mut buffer).unwrap();
@@ -150,9 +150,9 @@ mod test {
 
     #[test]
     fn pack_fc3() {
-        let regs = [0xAE41, 0x5652, 0x4340];
+        let regs = [0xAE41u16, 0x5652, 0x4340];
         let control = [0x03u8, 0x06, 0xAE, 0x41, 0x56, 0x52, 0x43, 0x40];
-        let pdu = ResponsePDU::read_holding_registers(&regs);
+        let pdu = ResponsePDU::read_holding_registers(&regs[..]);
         let mut buffer = BytesMut::new();
         buffer.resize(control.len(), 0);
         Codec::default().encode(pdu, &mut buffer).unwrap();
@@ -161,9 +161,9 @@ mod test {
 
     #[test]
     fn pack_fc4() {
-        let regs = [0x000A];
+        let regs = [0x000Au16];
         let control = [0x04, 0x02, 0x00, 0x0A];
-        let pdu = ResponsePDU::read_input_registers(&regs);
+        let pdu = ResponsePDU::read_input_registers(&regs[..]);
 
         let mut buffer = BytesMut::new();
         buffer.resize(control.len(), 0);
