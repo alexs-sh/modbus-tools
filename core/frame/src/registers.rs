@@ -87,3 +87,20 @@ impl<'a, 'b> RegisterStorage for CursorBe<'a, 'b> {
         self.nobjs
     }
 }
+
+#[cfg(test)]
+
+mod test {
+    use super::*;
+
+    #[test]
+    fn with_u8() {
+        let input = [1u8, 2, 3, 4, 5, 6];
+        let mut output = [0u8; 6];
+        let rs = &input[..];
+        let res = rs.registers_write(&mut output[..]);
+        assert_eq!(res, 3);
+        assert_eq!(rs.registers_count(), 3);
+        assert_eq!(&input, &output);
+    }
+}

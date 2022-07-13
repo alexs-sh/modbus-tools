@@ -175,4 +175,27 @@ mod test {
         assert_eq!(data.get_u8(1).unwrap(), 0x2);
         assert!(data.get_u8(4).is_none());
     }
+
+    #[test]
+    fn data_ops() {
+        let input = [1u8, 2, 3, 4];
+        let mut data = Data::raw(&input);
+        assert_eq!(data.len(), 4);
+        assert_eq!(data.get_u8(0).unwrap(), 0x1);
+
+        data.set_u8(0, 0xAA);
+        assert_eq!(data.get_u8(0).unwrap(), 0xAA);
+
+        data.set_u8(1, 0xBB);
+        assert_eq!(data.get_u8(1).unwrap(), 0xBB);
+        assert_eq!(data.get_u16(0).unwrap(), 0xBBAA);
+
+        assert_eq!(data.get_bit(0).unwrap(), false);
+        assert_eq!(data.get_bit(1).unwrap(), true);
+
+        data.set_bit(0, true);
+        data.set_bit(1, false);
+        assert_eq!(data.get_bit(0).unwrap(), true);
+        assert_eq!(data.get_bit(1).unwrap(), false);
+    }
 }

@@ -178,3 +178,29 @@ impl RequestPDU {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn rtu() {
+        let frame = RequestFrame::rtu(0x11, RequestPDU::read_coils(1, 1));
+        assert_eq!(frame.id, None);
+        assert_eq!(frame.slave, 0x11);
+        match frame.pdu {
+            RequestPDU::ReadCoils { .. } => {}
+            _ => unreachable!(),
+        }
+    }
+    #[test]
+    fn net() {
+        let frame = RequestFrame::net(0x10, 0x11, RequestPDU::read_coils(1, 1));
+        assert_eq!(frame.id, Some(0x10));
+        assert_eq!(frame.slave, 0x11);
+        match frame.pdu {
+            RequestPDU::ReadCoils { .. } => {}
+            _ => unreachable!(),
+        }
+    }
+}

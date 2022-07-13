@@ -72,4 +72,14 @@ mod test {
         assert!(res.is_err());
         assert_eq!(res.err().unwrap(), Error::InvalidData);
     }
+
+    #[test]
+    fn write_header() {
+        let control = [0x00u8, 0x01, 0x00, 0x00, 0x00, 0x06, 0x11];
+        let header = Header::new(0x1, 0x6, 0x11);
+        let mut buffer = BytesMut::new();
+        buffer.resize(control.len(), 0);
+        Codec::default().encode(header, &mut buffer).unwrap();
+        assert_eq!(&control[..], &buffer[..]);
+    }
 }

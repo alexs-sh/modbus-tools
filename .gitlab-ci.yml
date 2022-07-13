@@ -63,9 +63,9 @@ coverage:
     - export LLVM_PROFILE_FILE="reports-%p-%m.profraw"
     - cargo build
     - cargo test
-    - ./grcov . -s . --binary-path ./target/ -t html --branch --ignore-not-existing -o ./html
-    - ./grcov . -s . --binary-path ./target/ -t cobertura --branch --ignore-not-existing -o coverage.xml
-    - ./grcov . -s . --binary-path ./target/ -t lcov --branch --ignore-not-existing --ignore '/*' -o coverage.lcov
+    - ./grcov . -s . --binary-path ./target/ --ignore "tools/slave-rnd/*" -t html --branch --ignore-not-existing -o ./html
+    - ./grcov . -s . --binary-path ./target/ --ignore "tools/slave-rnd/*" -t cobertura --branch --ignore-not-existing -o coverage.xml
+    - ./grcov . -s . --binary-path ./target/ --ignore "tools/slave-rnd/*" -t lcov --branch --ignore-not-existing --ignore '/*' -o coverage.lcov
     - lcov --summary ./coverage.lcov
   coverage: /^\s*lines\.*\:\s*[0-9]+.[0-9]+%/
   artifacts:

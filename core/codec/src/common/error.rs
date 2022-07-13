@@ -18,3 +18,21 @@ impl From<io::Error> for Error {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::io;
+
+    #[test]
+    fn from_io_error() {
+        let err = io::Error::new(io::ErrorKind::InvalidData, "");
+        assert_eq!(Error::from(err), Error::InvalidData);
+
+        let err = io::Error::new(io::ErrorKind::UnexpectedEof, "");
+        assert_eq!(Error::from(err), Error::BufferToSmall);
+
+        let err = io::Error::new(io::ErrorKind::Other, "");
+        assert_eq!(Error::from(err), Error::Other);
+    }
+}
