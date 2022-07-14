@@ -12,14 +12,17 @@ use tokio_util::codec::{Decoder, Encoder};
 
 use log::debug;
 
-pub struct Codec {
+pub struct NetCodec {
     header: Option<Header>,
     name: String,
 }
 
-impl Codec {
-    pub fn new(name: String) -> Codec {
-        Codec { name, header: None }
+impl NetCodec {
+    pub fn new(name: &str) -> NetCodec {
+        NetCodec {
+            name: name.to_owned(),
+            header: None,
+        }
     }
 
     fn log_bytes(&self, prefix: &'static str, bytes: &mut BytesMut) {
@@ -29,13 +32,13 @@ impl Codec {
     }
 }
 
-impl Default for Codec {
-    fn default() -> Codec {
-        Codec::new("NetCodec".to_owned())
+impl Default for NetCodec {
+    fn default() -> NetCodec {
+        NetCodec::new("NetCodec")
     }
 }
 
-impl Decoder for Codec {
+impl Decoder for NetCodec {
     type Item = RequestFrame;
     type Error = Error;
 
@@ -62,7 +65,7 @@ impl Decoder for Codec {
     }
 }
 
-impl Encoder<ResponseFrame> for Codec {
+impl Encoder<ResponseFrame> for NetCodec {
     type Error = Error;
     fn encode(&mut self, msg: ResponseFrame, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let payload_size = msg.pdu.len() + 1;
@@ -96,7 +99,7 @@ mod test {
             0x00, 0x01, 0x00, 0x00, 0x00, 0x06, 0x11, 0x01, 0x00, 0x01, 0x00, 0xA,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
         assert_eq!(message.slave, 0x11);
         assert_eq!(message.id.unwrap(), 0x01);
@@ -115,7 +118,7 @@ mod test {
             0x00, 0x02, 0x00, 0x00, 0x00, 0x06, 0x12, 0x02, 0x00, 0x03, 0x00, 0xB,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
         assert_eq!(message.slave, 0x12);
         assert_eq!(message.id.unwrap(), 0x02);
@@ -134,7 +137,7 @@ mod test {
             0x00, 0x01, 0x00, 0x00, 0x00, 0x06, 0x11, 0x03, 0x00, 0x6B, 0x00, 0x03,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
         assert_eq!(message.slave, 0x11);
         assert_eq!(message.id.unwrap(), 0x01);
@@ -153,7 +156,7 @@ mod test {
             0x00, 0x01, 0x00, 0x01, 0x00, 0x06, 0x11, 0x03, 0x00, 0x6B, 0x00, 0x03,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes);
         assert!(message.is_err());
         assert_eq!(message.err().unwrap(), Error::InvalidVersion);
@@ -165,7 +168,7 @@ mod test {
             0x00, 0x01, 0x00, 0x00, 0x00, 0x06, 0x11, 0x03, 0x00, 0x6B, 0x00,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes);
         assert!(message.is_ok());
         assert_eq!(message.unwrap(), None);
@@ -178,7 +181,7 @@ mod test {
             0x00, 0x00, 0x00, 0x06, 0x12, 0x03, 0x00, 0x7B, 0x00, 0x03,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
         assert_eq!(message.slave, 0x11);
         assert_eq!(message.id.unwrap(), 0x01);
@@ -208,7 +211,7 @@ mod test {
             0x00, 0x04, 0x00, 0x00, 0x00, 0x06, 0x14, 0x04, 0x00, 0xA, 0x00, 0xF,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
         assert_eq!(message.slave, 0x14);
         assert_eq!(message.id.unwrap(), 0x04);
@@ -227,7 +230,7 @@ mod test {
             0x00, 0x04, 0x00, 0x00, 0x00, 0x06, 0x11, 0x05, 0x00, 0xAC, 0xFF, 0x00,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
         assert_eq!(message.slave, 0x11);
         assert_eq!(message.id.unwrap(), 0x04);
@@ -246,7 +249,7 @@ mod test {
             0x00, 0x04, 0x00, 0x00, 0x00, 0x06, 0x11, 0x05, 0x00, 0xAC, 0x00, 0x01,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes);
         assert!(message.is_err());
         assert_eq!(message.err().unwrap(), Error::InvalidData);
@@ -259,7 +262,7 @@ mod test {
         ];
 
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
         assert_eq!(message.slave, 0x11);
         assert_eq!(message.id.unwrap(), 0x04);
@@ -280,7 +283,7 @@ mod test {
         ];
 
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
         assert_eq!(message.slave, 0x11);
         assert_eq!(message.id.unwrap(), 0x05);
@@ -308,7 +311,7 @@ mod test {
         ];
 
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
         assert_eq!(message.slave, 0x11);
         assert_eq!(message.id.unwrap(), 0x06);
@@ -333,7 +336,7 @@ mod test {
         let input = [0x00, 0x01, 0x00, 0x00, 0x00, 0x04, 0x11, 0x2B, 0x0E, 0x1];
 
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
         assert_eq!(message.slave, 0x11);
         assert_eq!(message.id.unwrap(), 0x01);
@@ -352,7 +355,7 @@ mod test {
             0x00, 0x03, 0x00, 0x00, 0x00, 0x06, 0x02, 0x2B, 0x0E, 0x31, 0x31, 0x31,
         ];
         let mut buffer = BytesMut::with_capacity(256);
-        let mut encoder = Codec::default();
+        let mut encoder = NetCodec::default();
         let pdu = ResponsePDU::encapsulated_interface_transport(0xE, "111".as_bytes());
         let frame = ResponseFrame::net(0x3, 0x2, pdu);
         let _ = encoder.encode(frame, &mut buffer).unwrap();
@@ -366,7 +369,7 @@ mod test {
         let mut dst = BytesMut::from(&buffer[..]);
         let pdu = ResponsePDU::exception(0x3, Code::IllegalFunction);
         let frame = ResponseFrame::net(0x1, 0x1, pdu);
-        let _ = Codec::default().encode(frame, &mut dst).unwrap();
+        let _ = NetCodec::default().encode(frame, &mut dst).unwrap();
         assert_eq!(dst.len(), 9);
         assert_eq!(dst.as_ref(), control);
     }

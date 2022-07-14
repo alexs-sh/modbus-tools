@@ -14,44 +14,23 @@ use futures::{SinkExt, StreamExt};
 extern crate codec;
 extern crate frame;
 
-use codec::net::default::Codec as NetCodec;
-
-pub struct TcpServerHandler {
-    pub request_rx: mpsc::Receiver<Request>,
-}
-
-pub struct Request {
-    response_tx: mpsc::Sender<ResponseFrame>,
-    pub request: RequestFrame,
-}
-
-#[derive(Clone)]
-pub struct TcpServerSettings {
-    pub address: String,
-    pub nmsg: usize,
-}
-
-impl Request {
-    pub async fn response(&self, mut response: frame::response::ResponseFrame) {
-        response.id = self.request.id;
-        self.response_tx.send(response).await.unwrap();
-    }
-}
+use crate::{settings::Settings, Handler, Request};
+use codec::tcp::TcpCodec;
 
 pub struct TcpServer {
     listener: TcpListener,
     request_tx: mpsc::Sender<Request>,
 }
 
-struct TcpClient {
-    io: Framed<TcpStream, codec::net::default::Codec>,
+struct Client {
+    io: Framed<TcpStream, TcpCodec>,
     request_tx: mpsc::Sender<Request>,
     response_tx: mpsc::Sender<ResponseFrame>,
     response_rx: mpsc::Receiver<ResponseFrame>,
     address: String,
 }
 
-impl TcpClient {
+impl Client {
     fn spawn(mut self) {
         info!("{} connected", self.address);
         tokio::spawn(async move { while self.run().await {} });
@@ -97,35 +76,26 @@ impl TcpClient {
     }
 }
 
-impl Drop for TcpClient {
+impl Drop for Client {
     fn drop(&mut self) {
         info!("{} close", self.address);
     }
 }
 
-impl Default for TcpServerSettings {
-    fn default() -> TcpServerSettings {
-        TcpServerSettings {
-            address: "0.0.0.0:502".to_owned(),
-            nmsg: 128,
-        }
-    }
-}
-
 impl TcpServer {
-    pub async fn build(settings: TcpServerSettings) -> Result<TcpServerHandler, Error> {
-        let listener = TcpListener::bind(settings.address).await?;
+    pub async fn build(settings: Settings) -> Result<Handler, Error> {
+        let listener = TcpListener::bind(settings.address.get()).await?;
         let (tx, rx) = mpsc::channel(settings.nmsg);
         let server = TcpServer {
             listener,
             request_tx: tx,
         };
-        let handler = TcpServerHandler { request_rx: rx };
+        let handler = Handler { request_rx: rx };
         server.spawn();
         Ok(handler)
     }
 
-    fn spawn(mut self) {
+    pub fn spawn(mut self) {
         tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -140,12 +110,12 @@ impl TcpServer {
     fn spawn_client(&mut self, stream: TcpStream, address: SocketAddr) {
         let (tx, rx) = mpsc::channel(1);
         let address = address.to_string();
-        let client = TcpClient {
+        let client = Client {
             request_tx: self.request_tx.clone(),
             response_tx: tx,
             response_rx: rx,
             address: address.clone(),
-            io: Framed::new(stream, NetCodec::new(address)),
+            io: Framed::new(stream, TcpCodec::new(address.as_str())),
         };
         client.spawn();
     }

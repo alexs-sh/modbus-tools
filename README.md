@@ -40,12 +40,13 @@ Supported functions:
 - [ ] 0x16 Mask Write Register
 - [ ] 0x17 Read/Write Multiple registers
 - [ ] 0x18 Read FIFO Queue
-- [ ] 0x2B Encapsulated Interface Transport
+- [ ] 0x2B/0x0D Encapsulated Interface Transport
+- [x] 0x2B/0x0E Encapsulated Interface Transport. Read Device Identification
 
 Supported transport: 
 
 - [x] TCP
-- [ ] UDP
+- [x] UDP
 - [ ] Serial
 
 #### Build & run

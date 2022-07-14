@@ -3,12 +3,15 @@ use frame::exception::Code;
 use frame::request::{RequestFrame, RequestPDU};
 use frame::response::{ResponseFrame, ResponsePDU};
 use frame::{MAX_NCOILS, MAX_NREGS};
+use futures::{Stream, StreamExt};
 use log::{info, LevelFilter};
 use tokio::signal;
 
 use rand::Rng;
 use std::env;
-use transport::tcp::server::{TcpServer, TcpServerHandler, TcpServerSettings};
+use std::str::FromStr;
+use transport::builder;
+use transport::{settings::Settings, settings::TransportAddress};
 
 extern crate frame;
 extern crate transport;
@@ -91,7 +94,7 @@ fn make_answer(request: &RequestFrame) -> ResponseFrame {
     ResponseFrame::rtu(slave, pdu)
 }
 
-fn read_args() -> Option<TcpServerSettings> {
+fn read_args() -> Option<Settings> {
     let arg: String = env::args().skip(1).take(1).collect();
 
     if arg == "--help" || arg == "-h" {
@@ -113,20 +116,23 @@ Examples:
         );
         None
     } else {
-        let mut settings = TcpServerSettings::default();
+        let mut settings = Settings::default();
         if !arg.is_empty() {
-            settings.address = arg;
+            settings.address = TransportAddress::from_str(&arg).unwrap();
         }
         Some(settings)
     }
 }
 
-fn init_processor(mut server: TcpServerHandler) {
+fn init_processor<S>(mut input: S)
+where
+    S: Stream<Item = transport::Request> + std::marker::Unpin + std::marker::Send + 'static,
+{
     info!("start message processor");
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                Some(request) = server.request_rx.recv() => {
+                Some(request) = input.next() => {
                     request.response(make_answer(&request.request)).await;
                 }
             }
@@ -150,17 +156,12 @@ fn init_logger() {
     builder.init();
 }
 
-async fn init_server(settings: TcpServerSettings) -> Result<TcpServerHandler, std::io::Error> {
-    info!("start server {}", settings.address);
-    TcpServer::build(settings.clone()).await
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(settings) = read_args() {
         init_logger();
-        let server = init_server(settings).await?;
-        init_processor(server);
+        let input = builder::build(settings).await?;
+        init_processor(input);
         wait_ctrl_c().await;
     }
     Ok(())
