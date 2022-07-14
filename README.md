@@ -56,7 +56,7 @@ port that, in most cases, requires root privileges. Therefore all examples are
 presented on port 1502.
 
 ```
-cargo run -- "0.0.0.0:1502"
+cargo run -- "tcp:0.0.0.0:1502"
 ..
 [2022-07-08T14:49:25Z INFO  slave_rnd] start server 0.0.0.0:1502
 [2022-07-08T14:49:25Z INFO  slave_rnd] start message processor
@@ -68,7 +68,7 @@ cargo run -- "0.0.0.0:1502"
 Run with verbose output.
 
 ```
-RUST_LOG=debug cargo run -- "0.0.0.0:1502"
+RUST_LOG=debug cargo run -- "tcp:0.0.0.0:1502"
 ...
 [2022-07-08T14:50:16Z INFO  slave_rnd] start server 0.0.0.0:1502
 [2022-07-08T14:50:16Z INFO  slave_rnd] start message processor
