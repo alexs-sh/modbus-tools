@@ -1,4 +1,4 @@
-use super::common;
+use crate::common;
 use byteorder::{BigEndian, NativeEndian, ReadBytesExt, WriteBytesExt};
 use bytes::Buf;
 use std::cell::RefCell;
@@ -53,22 +53,22 @@ impl Registers for &[u16] {
     }
 }
 
-pub struct CursorBe<'a, 'b> {
+pub struct RegistersCursorBe<'a, 'b> {
     inner: RefCell<&'a mut Cursor<&'b [u8]>>,
     nobjs: u16,
 }
 
-impl<'a, 'b> CursorBe<'a, 'b> {
-    pub fn new(cursor: &'a mut Cursor<&'b [u8]>, nobjs: u16) -> CursorBe<'a, 'b> {
+impl<'a, 'b> RegistersCursorBe<'a, 'b> {
+    pub fn new(cursor: &'a mut Cursor<&'b [u8]>, nobjs: u16) -> RegistersCursorBe<'a, 'b> {
         assert!(cursor.remaining() >= common::nregs_len(nobjs));
-        CursorBe {
+        RegistersCursorBe {
             inner: RefCell::new(cursor),
             nobjs,
         }
     }
 }
 
-impl<'a, 'b> Registers for CursorBe<'a, 'b> {
+impl<'a, 'b> Registers for RegistersCursorBe<'a, 'b> {
     fn registers_write(&self, dst: &mut [u8]) -> u16 {
         let slen = common::nregs_len(self.nobjs as u16);
         let dlen = dst.len();

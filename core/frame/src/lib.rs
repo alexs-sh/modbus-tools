@@ -1,10 +1,6 @@
-pub mod bytes;
-pub mod coils;
 pub mod common;
 pub mod data;
 pub mod exception;
-pub mod header;
-pub mod registers;
 pub mod request;
 pub mod response;
 
