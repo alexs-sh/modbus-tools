@@ -1,8 +1,8 @@
-use super::data::Data;
-use super::{bytes::Bytes, coils::Coils, common, header::Header, registers::Registers};
+use super::common;
+use super::data::{Bytes, Coils, Data, Registers};
 
 #[derive(Debug, PartialEq)]
-pub enum RequestPDU {
+pub enum RequestPdu {
     /// 0x1
     ReadCoils {
         address: u16,
@@ -67,78 +67,56 @@ pub enum RequestPDU {
 
 #[derive(Debug, PartialEq)]
 pub struct RequestFrame {
-    pub id: Option<u16>,
-    /// message id (only ModbusTCP)
     pub slave: u8,
-    pub pdu: RequestPDU,
+    pub pdu: RequestPdu,
 }
 
 impl RequestFrame {
-    pub fn rtu(slave: u8, pdu: RequestPDU) -> RequestFrame {
-        RequestFrame {
-            id: None,
-            slave,
-            pdu,
-        }
-    }
-
-    pub fn net(id: u16, slave: u8, pdu: RequestPDU) -> RequestFrame {
-        RequestFrame {
-            id: Some(id),
-            slave,
-            pdu,
-        }
-    }
-
-    pub fn net_parts(header: Header, pdu: RequestPDU) -> RequestFrame {
-        RequestFrame {
-            id: Some(header.id),
-            slave: header.slave,
-            pdu,
-        }
+    pub fn new(slave: u8, pdu: RequestPdu) -> RequestFrame {
+        RequestFrame { slave, pdu }
     }
 }
 
-impl RequestPDU {
+impl RequestPdu {
     /// 0x1
-    pub fn read_coils(address: u16, nobjs: u16) -> RequestPDU {
+    pub fn read_coils(address: u16, nobjs: u16) -> RequestPdu {
         assert!(common::ncoils_check(nobjs));
-        RequestPDU::ReadCoils { address, nobjs }
+        RequestPdu::ReadCoils { address, nobjs }
     }
 
     /// 0x2
-    pub fn read_discrete_inputs(address: u16, nobjs: u16) -> RequestPDU {
+    pub fn read_discrete_inputs(address: u16, nobjs: u16) -> RequestPdu {
         assert!(common::ncoils_check(nobjs));
-        RequestPDU::ReadDiscreteInputs { address, nobjs }
+        RequestPdu::ReadDiscreteInputs { address, nobjs }
     }
 
     /// 0x3
-    pub fn read_holding_registers(address: u16, nobjs: u16) -> RequestPDU {
+    pub fn read_holding_registers(address: u16, nobjs: u16) -> RequestPdu {
         assert!(common::nregs_check(nobjs));
-        RequestPDU::ReadHoldingRegisters { address, nobjs }
+        RequestPdu::ReadHoldingRegisters { address, nobjs }
     }
 
     /// 0x4
-    pub fn read_input_registers(address: u16, nobjs: u16) -> RequestPDU {
+    pub fn read_input_registers(address: u16, nobjs: u16) -> RequestPdu {
         assert!(common::nregs_check(nobjs));
-        RequestPDU::ReadInputRegisters { address, nobjs }
+        RequestPdu::ReadInputRegisters { address, nobjs }
     }
 
     /// 0x5
-    pub fn write_single_coil(address: u16, value: bool) -> RequestPDU {
-        RequestPDU::WriteSingleCoil { address, value }
+    pub fn write_single_coil(address: u16, value: bool) -> RequestPdu {
+        RequestPdu::WriteSingleCoil { address, value }
     }
 
     /// 0x6
-    pub fn write_single_register(address: u16, value: u16) -> RequestPDU {
-        RequestPDU::WriteSingleRegister { address, value }
+    pub fn write_single_register(address: u16, value: u16) -> RequestPdu {
+        RequestPdu::WriteSingleRegister { address, value }
     }
 
     /// 0xF
-    pub fn write_multiple_coils(address: u16, coils: impl Coils) -> RequestPDU {
+    pub fn write_multiple_coils(address: u16, coils: impl Coils) -> RequestPdu {
         let nobjs = coils.coils_count();
         assert!(common::ncoils_check(nobjs));
-        RequestPDU::WriteMultipleCoils {
+        RequestPdu::WriteMultipleCoils {
             address,
             nobjs,
             data: Data::coils(coils),
@@ -146,10 +124,10 @@ impl RequestPDU {
     }
 
     /// 0x10
-    pub fn write_multiple_registers(address: u16, registers: impl Registers) -> RequestPDU {
+    pub fn write_multiple_registers(address: u16, registers: impl Registers) -> RequestPdu {
         let nobjs = registers.registers_count() as u16;
         assert!(common::nregs_check(nobjs));
-        RequestPDU::WriteMultipleRegisters {
+        RequestPdu::WriteMultipleRegisters {
             address,
             nobjs,
             data: Data::registers(registers),
@@ -157,7 +135,7 @@ impl RequestPDU {
     }
 
     /// 0x2b
-    pub fn encapsulated_interface_transport(mei_type: u8, bytes: impl Bytes) -> RequestPDU {
+    pub fn encapsulated_interface_transport(mei_type: u8, bytes: impl Bytes) -> RequestPdu {
         let len = bytes.bytes_count() as usize;
 
         assert!(common::data_bytes_check(len));
@@ -165,12 +143,12 @@ impl RequestPDU {
         let mut data = Data::raw_empty(len);
         bytes.bytes_write(data.get_mut());
 
-        RequestPDU::EncapsulatedInterfaceTransport { mei_type, data }
+        RequestPdu::EncapsulatedInterfaceTransport { mei_type, data }
     }
 
     /// Raw
-    pub fn raw(func: u8, data: Data) -> RequestPDU {
-        RequestPDU::Raw {
+    pub fn raw(func: u8, data: Data) -> RequestPdu {
+        RequestPdu::Raw {
             function: func,
             data,
         }
@@ -182,22 +160,11 @@ mod test {
     use super::*;
 
     #[test]
-    fn rtu() {
-        let frame = RequestFrame::rtu(0x11, RequestPDU::read_coils(1, 1));
-        assert_eq!(frame.id, None);
+    fn create_frame() {
+        let frame = RequestFrame::new(0x11, RequestPdu::read_coils(1, 1));
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
-            RequestPDU::ReadCoils { .. } => {}
-            _ => unreachable!(),
-        }
-    }
-    #[test]
-    fn net() {
-        let frame = RequestFrame::net(0x10, 0x11, RequestPDU::read_coils(1, 1));
-        assert_eq!(frame.id, Some(0x10));
-        assert_eq!(frame.slave, 0x11);
-        match frame.pdu {
-            RequestPDU::ReadCoils { .. } => {}
+            RequestPdu::ReadCoils { .. } => {}
             _ => unreachable!(),
         }
     }

@@ -40,12 +40,13 @@ Supported functions:
 - [ ] 0x16 Mask Write Register
 - [ ] 0x17 Read/Write Multiple registers
 - [ ] 0x18 Read FIFO Queue
-- [ ] 0x2B Encapsulated Interface Transport
+- [ ] 0x2B/0x0D Encapsulated Interface Transport
+- [x] 0x2B/0x0E Encapsulated Interface Transport. Read Device Identification
 
 Supported transport: 
 
 - [x] TCP
-- [ ] UDP
+- [x] UDP
 - [ ] Serial
 
 #### Build & run
@@ -55,7 +56,7 @@ port that, in most cases, requires root privileges. Therefore all examples are
 presented on port 1502.
 
 ```
-cargo run -- "0.0.0.0:1502"
+cargo run -- "tcp:0.0.0.0:1502"
 ..
 [2022-07-08T14:49:25Z INFO  slave_rnd] start server 0.0.0.0:1502
 [2022-07-08T14:49:25Z INFO  slave_rnd] start message processor
@@ -67,7 +68,7 @@ cargo run -- "0.0.0.0:1502"
 Run with verbose output.
 
 ```
-RUST_LOG=debug cargo run -- "0.0.0.0:1502"
+RUST_LOG=debug cargo run -- "tcp:0.0.0.0:1502"
 ...
 [2022-07-08T14:50:16Z INFO  slave_rnd] start server 0.0.0.0:1502
 [2022-07-08T14:50:16Z INFO  slave_rnd] start message processor

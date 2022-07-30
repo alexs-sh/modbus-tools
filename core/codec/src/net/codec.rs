@@ -1,25 +1,62 @@
 extern crate frame;
-
-use frame::{header::Header, MBAP_HEADER_LEN};
-
-use crate::common::{
-    error::Error, header::Codec as CodecHeader, request::Codec as CodecPDURequest,
-    response::Codec as CodecPDUResponse,
-};
+use super::header::Header;
+use crate::{error::Error, net::HeaderCodec, pdu::PduRequestCodec, pdu::PduResponseCodec};
 use bytes::{Buf, BytesMut};
-use frame::{request::RequestFrame, response::ResponseFrame};
+use frame::request::RequestFrame;
+use frame::response::ResponseFrame;
+use frame::{request::RequestPdu, response::ResponsePdu, MBAP_HEADER_LEN};
+use log::debug;
 use tokio_util::codec::{Decoder, Encoder};
 
-use log::debug;
+#[derive(PartialEq, Debug)]
+pub struct NetRequest {
+    pub id: u16,
+    pub frame: RequestFrame,
+}
 
-pub struct Codec {
+impl NetRequest {
+    pub fn new(id: u16, frame: RequestFrame) -> NetRequest {
+        NetRequest { id, frame }
+    }
+
+    pub fn from_parts(id: u16, slave: u8, pdu: RequestPdu) -> NetRequest {
+        NetRequest {
+            id,
+            frame: RequestFrame { slave, pdu },
+        }
+    }
+}
+
+#[derive(PartialEq, Debug)]
+pub struct NetResponse {
+    pub id: u16,
+    pub frame: ResponseFrame,
+}
+
+impl NetResponse {
+    pub fn new(id: u16, frame: ResponseFrame) -> NetResponse {
+        NetResponse { id, frame }
+    }
+
+    pub fn from_parts(id: u16, slave: u8, pdu: ResponsePdu) -> NetResponse {
+        NetResponse {
+            id,
+            frame: ResponseFrame { slave, pdu },
+        }
+    }
+}
+
+pub struct NetCodec {
     header: Option<Header>,
     name: String,
 }
 
-impl Codec {
-    pub fn new(name: String) -> Codec {
-        Codec { name, header: None }
+impl NetCodec {
+    pub fn new(name: &str) -> NetCodec {
+        NetCodec {
+            name: name.to_owned(),
+            header: None,
+        }
     }
 
     fn log_bytes(&self, prefix: &'static str, bytes: &mut BytesMut) {
@@ -29,51 +66,55 @@ impl Codec {
     }
 }
 
-impl Default for Codec {
-    fn default() -> Codec {
-        Codec::new("NetCodec".to_owned())
+impl Default for NetCodec {
+    fn default() -> NetCodec {
+        NetCodec::new("NetCodec")
     }
 }
 
-impl Decoder for Codec {
-    type Item = RequestFrame;
+impl Decoder for NetCodec {
+    type Item = NetRequest;
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.log_bytes("unpack", src);
         if self.header.is_none() && src.len() >= MBAP_HEADER_LEN {
-            let header = CodecHeader::default().decode(src)?.unwrap();
+            let header = HeaderCodec::default().decode(src)?.unwrap();
             self.header = Some(header);
             src.advance(MBAP_HEADER_LEN);
         }
 
         let needed = self.header.as_ref().map_or(0, |header| header.len - 1) as usize;
         let read_pdu = needed > 0 && needed <= src.len();
-        let pdu = if read_pdu {
-            CodecPDURequest::default().decode(src)?.map(|pdu| {
+        let request = if read_pdu {
+            PduRequestCodec::default().decode(src)?.map(|pdu| {
                 src.advance(needed);
-                RequestFrame::net_parts(self.header.take().unwrap(), pdu)
+                let header = self.header.take().unwrap();
+                NetRequest {
+                    id: header.id,
+                    frame: RequestFrame::new(header.slave, pdu),
+                }
             })
         } else {
             None
         };
 
-        Ok(pdu)
+        Ok(request)
     }
 }
 
-impl Encoder<ResponseFrame> for Codec {
+impl Encoder<NetResponse> for NetCodec {
     type Error = Error;
-    fn encode(&mut self, msg: ResponseFrame, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let payload_size = msg.pdu.len() + 1;
+    fn encode(&mut self, msg: NetResponse, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let payload_size = msg.frame.pdu.len() + 1;
         let full_size = 6 + payload_size;
         dst.resize(full_size, 0);
 
-        let header = Header::new(msg.id.unwrap(), payload_size as u16, msg.slave);
-        CodecHeader::default().encode(header, dst)?;
+        let header = Header::new(msg.id, payload_size as u16, msg.frame.slave);
+        HeaderCodec::default().encode(header, dst)?;
 
         let mut body = dst.split_off(7);
-        CodecPDUResponse::default().encode(msg.pdu, &mut body)?;
+        PduResponseCodec::default().encode(msg.frame.pdu, &mut body)?;
 
         dst.unsplit(body);
 
@@ -85,10 +126,10 @@ impl Encoder<ResponseFrame> for Codec {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::common::error::Error;
+    use crate::error::Error;
     use frame::exception::Code;
-    use frame::request::RequestPDU;
-    use frame::response::{ResponseFrame, ResponsePDU};
+    use frame::request::RequestPdu;
+    use frame::response::ResponsePdu;
 
     #[test]
     fn decode_fc1() {
@@ -96,12 +137,12 @@ mod test {
             0x00, 0x01, 0x00, 0x00, 0x00, 0x06, 0x11, 0x01, 0x00, 0x01, 0x00, 0xA,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
-        assert_eq!(message.slave, 0x11);
-        assert_eq!(message.id.unwrap(), 0x01);
-        match message.pdu {
-            RequestPDU::ReadCoils { address, nobjs } => {
+        assert_eq!(message.frame.slave, 0x11);
+        assert_eq!(message.id, 0x01);
+        match message.frame.pdu {
+            RequestPdu::ReadCoils { address, nobjs } => {
                 assert_eq!(address, 0x1);
                 assert_eq!(nobjs, 0xA);
             }
@@ -115,12 +156,12 @@ mod test {
             0x00, 0x02, 0x00, 0x00, 0x00, 0x06, 0x12, 0x02, 0x00, 0x03, 0x00, 0xB,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
-        assert_eq!(message.slave, 0x12);
-        assert_eq!(message.id.unwrap(), 0x02);
-        match message.pdu {
-            RequestPDU::ReadDiscreteInputs { address, nobjs } => {
+        assert_eq!(message.frame.slave, 0x12);
+        assert_eq!(message.id, 0x02);
+        match message.frame.pdu {
+            RequestPdu::ReadDiscreteInputs { address, nobjs } => {
                 assert_eq!(address, 0x3);
                 assert_eq!(nobjs, 0xB);
             }
@@ -134,12 +175,12 @@ mod test {
             0x00, 0x01, 0x00, 0x00, 0x00, 0x06, 0x11, 0x03, 0x00, 0x6B, 0x00, 0x03,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
-        assert_eq!(message.slave, 0x11);
-        assert_eq!(message.id.unwrap(), 0x01);
-        match message.pdu {
-            RequestPDU::ReadHoldingRegisters { address, nobjs } => {
+        assert_eq!(message.frame.slave, 0x11);
+        assert_eq!(message.id, 0x01);
+        match message.frame.pdu {
+            RequestPdu::ReadHoldingRegisters { address, nobjs } => {
                 assert_eq!(address, 0x6B);
                 assert_eq!(nobjs, 0x3);
             }
@@ -153,7 +194,7 @@ mod test {
             0x00, 0x01, 0x00, 0x01, 0x00, 0x06, 0x11, 0x03, 0x00, 0x6B, 0x00, 0x03,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes);
         assert!(message.is_err());
         assert_eq!(message.err().unwrap(), Error::InvalidVersion);
@@ -165,7 +206,7 @@ mod test {
             0x00, 0x01, 0x00, 0x00, 0x00, 0x06, 0x11, 0x03, 0x00, 0x6B, 0x00,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes);
         assert!(message.is_ok());
         assert_eq!(message.unwrap(), None);
@@ -178,12 +219,12 @@ mod test {
             0x00, 0x00, 0x00, 0x06, 0x12, 0x03, 0x00, 0x7B, 0x00, 0x03,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
-        assert_eq!(message.slave, 0x11);
-        assert_eq!(message.id.unwrap(), 0x01);
-        match message.pdu {
-            RequestPDU::ReadHoldingRegisters { address, nobjs } => {
+        assert_eq!(message.frame.slave, 0x11);
+        assert_eq!(message.id, 0x01);
+        match message.frame.pdu {
+            RequestPdu::ReadHoldingRegisters { address, nobjs } => {
                 assert_eq!(address, 0x6B);
                 assert_eq!(nobjs, 0x3);
             }
@@ -191,10 +232,10 @@ mod test {
         };
 
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
-        assert_eq!(message.slave, 0x12);
-        assert_eq!(message.id.unwrap(), 0x02);
-        match message.pdu {
-            RequestPDU::ReadHoldingRegisters { address, nobjs } => {
+        assert_eq!(message.frame.slave, 0x12);
+        assert_eq!(message.id, 0x02);
+        match message.frame.pdu {
+            RequestPdu::ReadHoldingRegisters { address, nobjs } => {
                 assert_eq!(address, 0x7B);
                 assert_eq!(nobjs, 0x3);
             }
@@ -208,12 +249,12 @@ mod test {
             0x00, 0x04, 0x00, 0x00, 0x00, 0x06, 0x14, 0x04, 0x00, 0xA, 0x00, 0xF,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
-        assert_eq!(message.slave, 0x14);
-        assert_eq!(message.id.unwrap(), 0x04);
-        match message.pdu {
-            RequestPDU::ReadInputRegisters { address, nobjs } => {
+        assert_eq!(message.frame.slave, 0x14);
+        assert_eq!(message.id, 0x04);
+        match message.frame.pdu {
+            RequestPdu::ReadInputRegisters { address, nobjs } => {
                 assert_eq!(address, 0xA);
                 assert_eq!(nobjs, 0xF);
             }
@@ -227,12 +268,12 @@ mod test {
             0x00, 0x04, 0x00, 0x00, 0x00, 0x06, 0x11, 0x05, 0x00, 0xAC, 0xFF, 0x00,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
-        assert_eq!(message.slave, 0x11);
-        assert_eq!(message.id.unwrap(), 0x04);
-        match message.pdu {
-            RequestPDU::WriteSingleCoil { address, value } => {
+        assert_eq!(message.frame.slave, 0x11);
+        assert_eq!(message.id, 0x04);
+        match message.frame.pdu {
+            RequestPdu::WriteSingleCoil { address, value } => {
                 assert_eq!(address, 0xAC);
                 assert_eq!(value, true);
             }
@@ -246,7 +287,7 @@ mod test {
             0x00, 0x04, 0x00, 0x00, 0x00, 0x06, 0x11, 0x05, 0x00, 0xAC, 0x00, 0x01,
         ];
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes);
         assert!(message.is_err());
         assert_eq!(message.err().unwrap(), Error::InvalidData);
@@ -259,12 +300,12 @@ mod test {
         ];
 
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
-        assert_eq!(message.slave, 0x11);
-        assert_eq!(message.id.unwrap(), 0x04);
-        match message.pdu {
-            RequestPDU::WriteSingleRegister { address, value } => {
+        assert_eq!(message.frame.slave, 0x11);
+        assert_eq!(message.id, 0x04);
+        match message.frame.pdu {
+            RequestPdu::WriteSingleRegister { address, value } => {
                 assert_eq!(address, 0xAD);
                 assert_eq!(value, 0x1313);
             }
@@ -280,12 +321,12 @@ mod test {
         ];
 
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
-        assert_eq!(message.slave, 0x11);
-        assert_eq!(message.id.unwrap(), 0x05);
-        match message.pdu {
-            RequestPDU::WriteMultipleCoils {
+        assert_eq!(message.frame.slave, 0x11);
+        assert_eq!(message.id, 0x05);
+        match message.frame.pdu {
+            RequestPdu::WriteMultipleCoils {
                 address,
                 nobjs,
                 data,
@@ -308,12 +349,12 @@ mod test {
         ];
 
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
-        assert_eq!(message.slave, 0x11);
-        assert_eq!(message.id.unwrap(), 0x06);
-        match message.pdu {
-            RequestPDU::WriteMultipleRegisters {
+        assert_eq!(message.frame.slave, 0x11);
+        assert_eq!(message.id, 0x06);
+        match message.frame.pdu {
+            RequestPdu::WriteMultipleRegisters {
                 address,
                 nobjs,
                 data,
@@ -333,12 +374,12 @@ mod test {
         let input = [0x00, 0x01, 0x00, 0x00, 0x00, 0x04, 0x11, 0x2B, 0x0E, 0x1];
 
         let mut bytes = BytesMut::from(&input[..]);
-        let mut decoder = Codec::default();
+        let mut decoder = NetCodec::default();
         let message = decoder.decode(&mut bytes).unwrap().unwrap();
-        assert_eq!(message.slave, 0x11);
-        assert_eq!(message.id.unwrap(), 0x01);
-        match message.pdu {
-            RequestPDU::EncapsulatedInterfaceTransport { mei_type, data } => {
+        assert_eq!(message.frame.slave, 0x11);
+        assert_eq!(message.id, 0x01);
+        match message.frame.pdu {
+            RequestPdu::EncapsulatedInterfaceTransport { mei_type, data } => {
                 assert_eq!(mei_type, 0xE);
                 assert_eq!(data.get_u8(0).unwrap(), 0x1);
             }
@@ -352,10 +393,13 @@ mod test {
             0x00, 0x03, 0x00, 0x00, 0x00, 0x06, 0x02, 0x2B, 0x0E, 0x31, 0x31, 0x31,
         ];
         let mut buffer = BytesMut::with_capacity(256);
-        let mut encoder = Codec::default();
-        let pdu = ResponsePDU::encapsulated_interface_transport(0xE, "111".as_bytes());
-        let frame = ResponseFrame::net(0x3, 0x2, pdu);
-        let _ = encoder.encode(frame, &mut buffer).unwrap();
+        let mut encoder = NetCodec::default();
+        let response = NetResponse::from_parts(
+            0x03,
+            0x02,
+            ResponsePdu::encapsulated_interface_transport(0xE, "111".as_bytes()),
+        );
+        let _ = encoder.encode(response, &mut buffer).unwrap();
         assert_eq!(control, buffer.as_ref());
     }
 
@@ -364,9 +408,9 @@ mod test {
         let control = [0x00, 0x01, 0x00, 0x00, 0x00, 0x03, 0x1, 0x83, 0x1];
         let buffer = [0u8; 256];
         let mut dst = BytesMut::from(&buffer[..]);
-        let pdu = ResponsePDU::exception(0x3, Code::IllegalFunction);
-        let frame = ResponseFrame::net(0x1, 0x1, pdu);
-        let _ = Codec::default().encode(frame, &mut dst).unwrap();
+        let response =
+            NetResponse::from_parts(0x1, 0x1, ResponsePdu::exception(0x3, Code::IllegalFunction));
+        let _ = NetCodec::default().encode(response, &mut dst).unwrap();
         assert_eq!(dst.len(), 9);
         assert_eq!(dst.as_ref(), control);
     }

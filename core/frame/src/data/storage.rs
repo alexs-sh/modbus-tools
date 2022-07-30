@@ -1,37 +1,37 @@
-use super::{coils::Coils, common, registers::Registers, MAX_DATA_SIZE};
-
+use super::{Coils, Registers};
+use crate::{common, MAX_DATA_SIZE};
 use smallvec::SmallVec;
 
 #[derive(Debug, PartialEq)]
-pub struct Data {
+pub struct DataStorage {
     buffer: SmallVec<[u8; MAX_DATA_SIZE]>,
 }
 
-impl Data {
-    pub fn raw(bytes: &[u8]) -> Data {
+impl DataStorage {
+    pub fn raw(bytes: &[u8]) -> DataStorage {
         assert!(bytes.len() <= MAX_DATA_SIZE);
         let buffer = SmallVec::<[u8; MAX_DATA_SIZE]>::from(bytes);
-        Data { buffer }
+        DataStorage { buffer }
     }
 
-    pub fn raw_empty(size: usize) -> Data {
+    pub fn raw_empty(size: usize) -> DataStorage {
         assert!(size <= MAX_DATA_SIZE);
         let mut buffer = SmallVec::<[u8; MAX_DATA_SIZE]>::new();
         buffer.resize(size, 0);
-        Data { buffer }
+        DataStorage { buffer }
     }
 
-    pub fn coils(coils: impl Coils) -> Data {
+    pub fn coils(coils: impl Coils) -> DataStorage {
         let nobjs = coils.coils_count();
-        let mut data = Data::coils_empty(nobjs);
+        let mut data = DataStorage::coils_empty(nobjs);
         let written = coils.coils_write(data.get_mut());
         assert!(written == nobjs);
         data
     }
 
-    pub fn registers(registers: impl Registers) -> Data {
+    pub fn registers(registers: impl Registers) -> DataStorage {
         let nobjs = registers.registers_count();
-        let mut data = Data::registers_empty(nobjs);
+        let mut data = DataStorage::registers_empty(nobjs);
         let written = registers.registers_write(data.get_mut());
         assert!(written == nobjs);
         data
@@ -110,22 +110,22 @@ impl Data {
         }
     }
 
-    fn registers_empty(nobjs: u16) -> Data {
+    fn registers_empty(nobjs: u16) -> DataStorage {
         assert!(common::nregs_check(nobjs as u16));
 
         let len = common::nregs_len(nobjs);
         let mut buffer = SmallVec::<[u8; MAX_DATA_SIZE]>::new();
         buffer.resize(len as usize, 0);
-        Data { buffer }
+        DataStorage { buffer }
     }
 
-    fn coils_empty(nobjs: u16) -> Data {
+    fn coils_empty(nobjs: u16) -> DataStorage {
         assert!(common::ncoils_check(nobjs));
 
         let len = common::ncoils_len(nobjs);
         let mut buffer = SmallVec::<[u8; MAX_DATA_SIZE]>::new();
         buffer.resize(len as usize, 0);
-        Data { buffer }
+        DataStorage { buffer }
     }
 }
 
@@ -137,13 +137,13 @@ mod test {
     fn data_coils() {
         let input = [true, false, false, false, true, false, false, false];
 
-        let data = Data::coils(&input[0..1]);
+        let data = DataStorage::coils(&input[0..1]);
         assert_eq!(data.len(), 1);
         assert_eq!(data.get_bit(0).unwrap(), true);
         assert_eq!(data.get_u8(0).unwrap(), 0x1);
         assert!(data.get_u16(0).is_none());
 
-        let data = Data::coils(&input[..]);
+        let data = DataStorage::coils(&input[..]);
         assert_eq!(data.len(), 1);
         assert_eq!(data.get_bit(0).unwrap(), true);
         assert_eq!(data.get_u8(0).unwrap(), 0x1 | 0x10);
@@ -153,12 +153,12 @@ mod test {
     #[test]
     fn data_registers() {
         let input = [1u16, 2, 3, 4];
-        let data = Data::registers(&input[0..1]);
+        let data = DataStorage::registers(&input[0..1]);
         assert_eq!(data.len(), 2);
         assert_eq!(data.get_u16(0).unwrap(), 0x1);
         assert!(data.get_u16(1).is_none());
 
-        let data = Data::registers(&input[..]);
+        let data = DataStorage::registers(&input[..]);
         assert_eq!(data.len(), 8);
         assert_eq!(data.get_u16(0).unwrap(), 0x1);
         assert_eq!(data.get_u16(1).unwrap(), 0x2);
@@ -169,7 +169,7 @@ mod test {
     #[test]
     fn data_raw() {
         let input = [1u8, 2, 3, 4];
-        let data = Data::raw(&input);
+        let data = DataStorage::raw(&input);
         assert_eq!(data.len(), 4);
         assert_eq!(data.get_u8(0).unwrap(), 0x1);
         assert_eq!(data.get_u8(1).unwrap(), 0x2);
@@ -179,7 +179,7 @@ mod test {
     #[test]
     fn data_ops() {
         let input = [1u8, 2, 3, 4];
-        let mut data = Data::raw(&input);
+        let mut data = DataStorage::raw(&input);
         assert_eq!(data.len(), 4);
         assert_eq!(data.get_u8(0).unwrap(), 0x1);
 

@@ -1,14 +1,17 @@
 use env_logger::Builder;
 use frame::exception::Code;
-use frame::request::{RequestFrame, RequestPDU};
-use frame::response::{ResponseFrame, ResponsePDU};
+use frame::request::{RequestFrame, RequestPdu};
+use frame::response::{ResponseFrame, ResponsePdu};
 use frame::{MAX_NCOILS, MAX_NREGS};
+use futures::{Stream, StreamExt};
 use log::{info, LevelFilter};
 use tokio::signal;
 
 use rand::Rng;
 use std::env;
-use transport::tcp::server::{TcpServer, TcpServerHandler, TcpServerSettings};
+use std::str::FromStr;
+use transport::builder;
+use transport::{settings::Settings, settings::TransportAddress, Response};
 
 extern crate frame;
 extern crate transport;
@@ -26,72 +29,70 @@ fn fill_coils(coils: &mut [bool]) {
 }
 
 fn make_answer(request: &RequestFrame) -> ResponseFrame {
-    let slave = request.slave;
-
     let mut registers = [0u16; MAX_NREGS];
     let mut coils = [false; MAX_NCOILS];
-
     let pdu = match &request.pdu {
-        RequestPDU::ReadCoils { nobjs, .. } => {
+        RequestPdu::ReadCoils { nobjs, .. } => {
             let nobjs = *nobjs as usize;
             fill_coils(&mut coils[0..nobjs]);
-            ResponsePDU::read_coils(&coils[0..nobjs])
+            ResponsePdu::read_coils(&coils[0..nobjs])
         }
 
-        RequestPDU::ReadDiscreteInputs { nobjs, .. } => {
+        RequestPdu::ReadDiscreteInputs { nobjs, .. } => {
             let nobjs = *nobjs as usize;
             fill_coils(&mut coils[0..nobjs]);
-            ResponsePDU::read_discrete_inputs(&coils[0..nobjs as usize])
+            ResponsePdu::read_discrete_inputs(&coils[0..nobjs as usize])
         }
 
-        RequestPDU::ReadHoldingRegisters { nobjs, .. } => {
+        RequestPdu::ReadHoldingRegisters { nobjs, .. } => {
             let nobjs = *nobjs as usize;
             fill_registers(&mut registers[0..nobjs]);
-            ResponsePDU::read_holding_registers(&registers[0..nobjs])
+            ResponsePdu::read_holding_registers(&registers[0..nobjs])
         }
 
-        RequestPDU::ReadInputRegisters { nobjs, .. } => {
+        RequestPdu::ReadInputRegisters { nobjs, .. } => {
             let nobjs = *nobjs as usize;
             fill_registers(&mut registers[0..nobjs]);
-            ResponsePDU::read_input_registers(&registers[0..nobjs as usize])
+            ResponsePdu::read_input_registers(&registers[0..nobjs as usize])
         }
 
-        RequestPDU::WriteSingleCoil { address, value } => {
-            ResponsePDU::write_single_coil(*address, *value)
+        RequestPdu::WriteSingleCoil { address, value } => {
+            ResponsePdu::write_single_coil(*address, *value)
         }
 
-        RequestPDU::WriteSingleRegister { address, value } => {
-            ResponsePDU::write_single_register(*address, *value)
+        RequestPdu::WriteSingleRegister { address, value } => {
+            ResponsePdu::write_single_register(*address, *value)
         }
 
-        RequestPDU::WriteMultipleCoils { address, nobjs, .. } => {
-            ResponsePDU::write_multiple_coils(*address, *nobjs)
+        RequestPdu::WriteMultipleCoils { address, nobjs, .. } => {
+            ResponsePdu::write_multiple_coils(*address, *nobjs)
         }
 
-        RequestPDU::WriteMultipleRegisters { address, nobjs, .. } => {
-            ResponsePDU::write_multiple_registers(*address, *nobjs)
+        RequestPdu::WriteMultipleRegisters { address, nobjs, .. } => {
+            ResponsePdu::write_multiple_registers(*address, *nobjs)
         }
 
-        RequestPDU::EncapsulatedInterfaceTransport { mei_type, data, .. } => {
+        RequestPdu::EncapsulatedInterfaceTransport { mei_type, data, .. } => {
             match (mei_type, data.get_u8(0)) {
                 (0xE, Some(0) | Some(1) | Some(2)) => {
-                    ResponsePDU::encapsulated_interface_transport(
+                    ResponsePdu::encapsulated_interface_transport(
                         *mei_type,
                         "modbus-imit".as_bytes(),
                     )
                 }
-                _ => ResponsePDU::exception(0x2b, Code::IllegalDataValue),
+                _ => ResponsePdu::exception(0x2b, Code::IllegalDataValue),
             }
         }
 
-        RequestPDU::Raw { function, .. } => {
-            ResponsePDU::exception(*function, Code::IllegalFunction)
+        RequestPdu::Raw { function, .. } => {
+            ResponsePdu::exception(*function, Code::IllegalFunction)
         }
     };
-    ResponseFrame::rtu(slave, pdu)
+
+    ResponseFrame::new(request.slave, pdu)
 }
 
-fn read_args() -> Option<TcpServerSettings> {
+fn read_args() -> Option<Settings> {
     let arg: String = env::args().skip(1).take(1).collect();
 
     if arg == "--help" || arg == "-h" {
@@ -113,21 +114,28 @@ Examples:
         );
         None
     } else {
-        let mut settings = TcpServerSettings::default();
+        let mut settings = Settings::default();
         if !arg.is_empty() {
-            settings.address = arg;
+            settings.address = TransportAddress::from_str(&arg).unwrap();
         }
         Some(settings)
     }
 }
 
-fn init_processor(mut server: TcpServerHandler) {
+fn init_processor<S>(mut input: S)
+where
+    S: Stream<Item = transport::Request> + std::marker::Unpin + std::marker::Send + 'static,
+{
     info!("start message processor");
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                Some(request) = server.request_rx.recv() => {
-                    request.response(make_answer(&request.request)).await;
+                Some(request) = input.next() => {
+                    let answer = make_answer(&request.payload);
+                    Response::make(
+                        request,
+                        answer
+                    ).send().await;
                 }
             }
         }
@@ -150,17 +158,12 @@ fn init_logger() {
     builder.init();
 }
 
-async fn init_server(settings: TcpServerSettings) -> Result<TcpServerHandler, std::io::Error> {
-    info!("start server {}", settings.address);
-    TcpServer::build(settings.clone()).await
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(settings) = read_args() {
         init_logger();
-        let server = init_server(settings).await?;
-        init_processor(server);
+        let input = builder::build(settings).await?;
+        init_processor(input);
         wait_ctrl_c().await;
     }
     Ok(())

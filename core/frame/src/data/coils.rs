@@ -1,4 +1,4 @@
-use super::common;
+use crate::common;
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use bytes::Buf;
 use std::cell::RefCell;
@@ -65,22 +65,22 @@ impl<'a> Coils for CoilsSlice<'a> {
     }
 }
 
-pub struct CursorCoils<'a, 'b> {
+pub struct CoilsCursor<'a, 'b> {
     inner: RefCell<&'a mut Cursor<&'b [u8]>>,
     nobjs: u16,
 }
 
-impl<'a, 'b> CursorCoils<'a, 'b> {
-    pub fn new(cursor: &'a mut Cursor<&'b [u8]>, nobjs: u16) -> CursorCoils<'a, 'b> {
+impl<'a, 'b> CoilsCursor<'a, 'b> {
+    pub fn new(cursor: &'a mut Cursor<&'b [u8]>, nobjs: u16) -> CoilsCursor<'a, 'b> {
         assert!(cursor.remaining() >= common::ncoils_len(nobjs));
-        CursorCoils {
+        CoilsCursor {
             inner: RefCell::new(cursor),
             nobjs,
         }
     }
 }
 
-impl<'a, 'b> Coils for CursorCoils<'a, 'b> {
+impl<'a, 'b> Coils for CoilsCursor<'a, 'b> {
     fn coils_write(&self, dst: &mut [u8]) -> u16 {
         let slen = common::ncoils_len(self.nobjs);
         let dlen = dst.len();

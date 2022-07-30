@@ -1,7 +1,8 @@
-use super::{coils::Coils, common, data::Data, exception::Code, registers::Registers};
+use super::data::{Coils, Data, Registers};
+use super::{common, exception::Code};
 
 #[derive(Debug, PartialEq)]
-pub enum ResponsePDU {
+pub enum ResponsePdu {
     /// 0x1
     ReadCoils {
         nobjs: u16,
@@ -70,128 +71,114 @@ pub enum ResponsePDU {
 
 #[derive(Debug, PartialEq)]
 pub struct ResponseFrame {
-    pub id: Option<u16>,
-    /// message id (only ModbusTCP)
     pub slave: u8,
-    pub pdu: ResponsePDU,
+    pub pdu: ResponsePdu,
 }
 
 impl ResponseFrame {
-    pub fn rtu(slave: u8, pdu: ResponsePDU) -> ResponseFrame {
-        ResponseFrame {
-            id: None,
-            slave,
-            pdu,
-        }
-    }
-
-    pub fn net(id: u16, slave: u8, pdu: ResponsePDU) -> ResponseFrame {
-        ResponseFrame {
-            id: Some(id),
-            slave,
-            pdu,
-        }
+    pub fn new(slave: u8, pdu: ResponsePdu) -> ResponseFrame {
+        ResponseFrame { slave, pdu }
     }
 }
 
-impl ResponsePDU {
+impl ResponsePdu {
     pub fn len(&self) -> usize {
         match self {
-            ResponsePDU::ReadCoils { data, .. }
-            | ResponsePDU::ReadDiscreteInputs { data, .. }
-            | ResponsePDU::ReadHoldingRegisters { data, .. }
-            | ResponsePDU::ReadInputRegisters { data, .. } => 2 + data.len(),
-            ResponsePDU::WriteSingleCoil { .. }
-            | ResponsePDU::WriteSingleRegister { .. }
-            | ResponsePDU::WriteMultipleCoils { .. }
-            | ResponsePDU::WriteMultipleRegisters { .. } => 5,
-            ResponsePDU::EncapsulatedInterfaceTransport { data, .. } => 2 + data.len(),
-            ResponsePDU::Raw { data, .. } => 1 + data.len(),
-            ResponsePDU::Exception { .. } => 2,
+            ResponsePdu::ReadCoils { data, .. }
+            | ResponsePdu::ReadDiscreteInputs { data, .. }
+            | ResponsePdu::ReadHoldingRegisters { data, .. }
+            | ResponsePdu::ReadInputRegisters { data, .. } => 2 + data.len(),
+            ResponsePdu::WriteSingleCoil { .. }
+            | ResponsePdu::WriteSingleRegister { .. }
+            | ResponsePdu::WriteMultipleCoils { .. }
+            | ResponsePdu::WriteMultipleRegisters { .. } => 5,
+            ResponsePdu::EncapsulatedInterfaceTransport { data, .. } => 2 + data.len(),
+            ResponsePdu::Raw { data, .. } => 1 + data.len(),
+            ResponsePdu::Exception { .. } => 2,
         }
     }
 }
 
-impl ResponsePDU {
+impl ResponsePdu {
     /// 0x1
-    pub fn read_coils(coils: impl Coils) -> ResponsePDU {
-        ResponsePDU::read_coils_inner(1, coils)
+    pub fn read_coils(coils: impl Coils) -> ResponsePdu {
+        ResponsePdu::read_coils_inner(1, coils)
     }
 
     /// 0x2
-    pub fn read_discrete_inputs(coils: impl Coils) -> ResponsePDU {
-        ResponsePDU::read_coils_inner(2, coils)
+    pub fn read_discrete_inputs(coils: impl Coils) -> ResponsePdu {
+        ResponsePdu::read_coils_inner(2, coils)
     }
 
     /// 0x3
-    pub fn read_holding_registers(registers: impl Registers) -> ResponsePDU {
-        ResponsePDU::read_registers_inner(3, registers)
+    pub fn read_holding_registers(registers: impl Registers) -> ResponsePdu {
+        ResponsePdu::read_registers_inner(3, registers)
     }
 
     /// 0x4
-    pub fn read_input_registers(registers: impl Registers) -> ResponsePDU {
-        ResponsePDU::read_registers_inner(4, registers)
+    pub fn read_input_registers(registers: impl Registers) -> ResponsePdu {
+        ResponsePdu::read_registers_inner(4, registers)
     }
 
     /// 0x5
-    pub fn write_single_coil(address: u16, value: bool) -> ResponsePDU {
-        ResponsePDU::WriteSingleCoil { address, value }
+    pub fn write_single_coil(address: u16, value: bool) -> ResponsePdu {
+        ResponsePdu::WriteSingleCoil { address, value }
     }
 
     /// 0x6
-    pub fn write_single_register(address: u16, value: u16) -> ResponsePDU {
-        ResponsePDU::WriteSingleRegister { address, value }
+    pub fn write_single_register(address: u16, value: u16) -> ResponsePdu {
+        ResponsePdu::WriteSingleRegister { address, value }
     }
 
     /// 0xF
-    pub fn write_multiple_coils(address: u16, nobjs: u16) -> ResponsePDU {
+    pub fn write_multiple_coils(address: u16, nobjs: u16) -> ResponsePdu {
         assert!(common::ncoils_check(nobjs));
-        ResponsePDU::WriteMultipleCoils { address, nobjs }
+        ResponsePdu::WriteMultipleCoils { address, nobjs }
     }
 
     /// 0x10
-    pub fn write_multiple_registers(address: u16, nobjs: u16) -> ResponsePDU {
+    pub fn write_multiple_registers(address: u16, nobjs: u16) -> ResponsePdu {
         assert!(common::nregs_check(nobjs));
-        ResponsePDU::WriteMultipleRegisters { address, nobjs }
+        ResponsePdu::WriteMultipleRegisters { address, nobjs }
     }
 
     /// 0x2b
-    pub fn encapsulated_interface_transport(mei_type: u8, data: &[u8]) -> ResponsePDU {
+    pub fn encapsulated_interface_transport(mei_type: u8, data: &[u8]) -> ResponsePdu {
         assert!(common::data_bytes_check(data.len()));
-        ResponsePDU::EncapsulatedInterfaceTransport {
+        ResponsePdu::EncapsulatedInterfaceTransport {
             mei_type,
             data: Data::raw(data),
         }
     }
 
     /// make response with exception
-    pub fn exception(func: u8, code: Code) -> ResponsePDU {
-        ResponsePDU::Exception {
+    pub fn exception(func: u8, code: Code) -> ResponsePdu {
+        ResponsePdu::Exception {
             function: func | 0x80,
             code,
         }
     }
 
     /// raw
-    pub fn raw(func: u8, data: Data) -> ResponsePDU {
-        ResponsePDU::Raw {
+    pub fn raw(func: u8, data: Data) -> ResponsePdu {
+        ResponsePdu::Raw {
             function: func,
             data,
         }
     }
 
-    fn read_coils_inner(func: u8, coils: impl Coils) -> ResponsePDU {
+    fn read_coils_inner(func: u8, coils: impl Coils) -> ResponsePdu {
         let nobjs = coils.coils_count();
 
         assert!(common::ncoils_check(nobjs));
         assert!(func == 0x1 || func == 0x2);
 
         match func {
-            0x1 => ResponsePDU::ReadCoils {
+            0x1 => ResponsePdu::ReadCoils {
                 nobjs,
                 data: Data::coils(coils),
             },
-            0x2 => ResponsePDU::ReadDiscreteInputs {
+            0x2 => ResponsePdu::ReadDiscreteInputs {
                 nobjs,
                 data: Data::coils(coils),
             },
@@ -199,17 +186,17 @@ impl ResponsePDU {
         }
     }
 
-    fn read_registers_inner(func: u8, registers: impl Registers) -> ResponsePDU {
+    fn read_registers_inner(func: u8, registers: impl Registers) -> ResponsePdu {
         let nobjs = registers.registers_count();
         assert!(common::nregs_check(nobjs));
         assert!(func == 0x3 || func == 0x4);
 
         match func {
-            0x3 => ResponsePDU::ReadHoldingRegisters {
+            0x3 => ResponsePdu::ReadHoldingRegisters {
                 nobjs,
                 data: Data::registers(registers),
             },
-            0x4 => ResponsePDU::ReadInputRegisters {
+            0x4 => ResponsePdu::ReadInputRegisters {
                 nobjs,
                 data: Data::registers(registers),
             },
@@ -228,10 +215,10 @@ mod test {
         let nbits = 37;
         let bytes = [0xCD, 0x6B, 0xB2, 0x0E, 0x1B];
         let bits = common::bits_from_bytes(&bytes, nbits);
-        let frame = ResponseFrame::rtu(0x11, ResponsePDU::read_coils(bits.as_slice()));
+        let frame = ResponseFrame::new(0x11, ResponsePdu::read_coils(bits.as_slice()));
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
-            ResponsePDU::ReadCoils { nobjs, data } => {
+            ResponsePdu::ReadCoils { nobjs, data } => {
                 assert_eq!(nobjs, nbits as u16);
                 assert_eq!(data.len(), 0x5);
                 assert_eq!(data.get_u8(0).unwrap(), 0xCD);
@@ -249,10 +236,10 @@ mod test {
         let nbits = 37;
         let bytes = [0xCD, 0x6B, 0xB2, 0x0E, 0x1B];
         let bits = common::bits_from_bytes(&bytes, nbits);
-        let frame = ResponseFrame::rtu(0x11, ResponsePDU::read_coils(bits.as_slice()));
+        let frame = ResponseFrame::new(0x11, ResponsePdu::read_coils(bits.as_slice()));
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
-            ResponsePDU::ReadCoils { nobjs, data } => {
+            ResponsePdu::ReadCoils { nobjs, data } => {
                 assert_eq!(nobjs, nbits as u16);
                 assert_eq!(data.len(), 0x5);
                 assert_eq!(data.get_u8(0).unwrap(), 0xCD);
@@ -270,10 +257,10 @@ mod test {
         let nbits = 37;
         let bytes = [0xCD, 0x6B, 0xB2, 0x0E, 0x1B];
         let bits = common::bits_from_bytes(&bytes, nbits);
-        let frame = ResponseFrame::rtu(0x11, ResponsePDU::read_discrete_inputs(bits.as_slice()));
+        let frame = ResponseFrame::new(0x11, ResponsePdu::read_discrete_inputs(bits.as_slice()));
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
-            ResponsePDU::ReadDiscreteInputs { nobjs, data } => {
+            ResponsePdu::ReadDiscreteInputs { nobjs, data } => {
                 assert_eq!(nobjs, nbits as u16);
                 assert_eq!(data.len(), 0x5);
                 assert_eq!(data.get_u8(0).unwrap(), 0xCD);
@@ -289,13 +276,13 @@ mod test {
     #[test]
     fn build_fc3_response() {
         let registers = [1u16, 2, 0xFFFF];
-        let frame = ResponseFrame::rtu(
+        let frame = ResponseFrame::new(
             0x11,
-            ResponsePDU::read_holding_registers(registers.as_slice()),
+            ResponsePdu::read_holding_registers(registers.as_slice()),
         );
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
-            ResponsePDU::ReadHoldingRegisters { nobjs, data } => {
+            ResponsePdu::ReadHoldingRegisters { nobjs, data } => {
                 assert_eq!(nobjs, 3);
                 assert_eq!(data.len(), 0x6);
                 assert_eq!(data.get_u16(0).unwrap(), 1);
@@ -309,13 +296,13 @@ mod test {
     #[test]
     fn build_fc4_response() {
         let registers = [1u16, 2, 3, 0xFFFF];
-        let frame = ResponseFrame::rtu(
+        let frame = ResponseFrame::new(
             0x11,
-            ResponsePDU::read_input_registers(registers.as_slice()),
+            ResponsePdu::read_input_registers(registers.as_slice()),
         );
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
-            ResponsePDU::ReadInputRegisters { nobjs, data } => {
+            ResponsePdu::ReadInputRegisters { nobjs, data } => {
                 assert_eq!(nobjs, 4);
                 assert_eq!(data.len(), 0x8);
                 assert_eq!(data.get_u16(0).unwrap(), 1);
@@ -329,10 +316,10 @@ mod test {
 
     #[test]
     fn build_fc5_response() {
-        let frame = ResponseFrame::rtu(0x11, ResponsePDU::write_single_coil(0x00AC, true));
+        let frame = ResponseFrame::new(0x11, ResponsePdu::write_single_coil(0x00AC, true));
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
-            ResponsePDU::WriteSingleCoil { address, value } => {
+            ResponsePdu::WriteSingleCoil { address, value } => {
                 assert_eq!(address, 0x00AC);
                 assert_eq!(value, true);
             }
@@ -342,10 +329,10 @@ mod test {
 
     #[test]
     fn build_fc6_response() {
-        let frame = ResponseFrame::rtu(0x11, ResponsePDU::write_single_register(0x00AC, 0x123));
+        let frame = ResponseFrame::new(0x11, ResponsePdu::write_single_register(0x00AC, 0x123));
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
-            ResponsePDU::WriteSingleRegister { address, value } => {
+            ResponsePdu::WriteSingleRegister { address, value } => {
                 assert_eq!(address, 0x00AC);
                 assert_eq!(value, 0x123);
             }
@@ -355,10 +342,10 @@ mod test {
 
     #[test]
     fn build_fc15_response() {
-        let frame = ResponseFrame::rtu(0x11, ResponsePDU::write_multiple_coils(0x00AC, 0x10));
+        let frame = ResponseFrame::new(0x11, ResponsePdu::write_multiple_coils(0x00AC, 0x10));
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
-            ResponsePDU::WriteMultipleCoils { address, nobjs } => {
+            ResponsePdu::WriteMultipleCoils { address, nobjs } => {
                 assert_eq!(address, 0x00AC);
                 assert_eq!(nobjs, 0x10);
             }
@@ -368,10 +355,10 @@ mod test {
 
     #[test]
     fn build_fc16_response() {
-        let frame = ResponseFrame::rtu(0x11, ResponsePDU::write_multiple_registers(0x00AC, 0x11));
+        let frame = ResponseFrame::new(0x11, ResponsePdu::write_multiple_registers(0x00AC, 0x11));
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
-            ResponsePDU::WriteMultipleRegisters { address, nobjs } => {
+            ResponsePdu::WriteMultipleRegisters { address, nobjs } => {
                 assert_eq!(address, 0x00AC);
                 assert_eq!(nobjs, 0x11);
             }
@@ -381,10 +368,10 @@ mod test {
 
     #[test]
     fn build_exception_response() {
-        let frame = ResponseFrame::rtu(0x11, ResponsePDU::exception(0x3, Code::IllegalFunction));
+        let frame = ResponseFrame::new(0x11, ResponsePdu::exception(0x3, Code::IllegalFunction));
         assert_eq!(frame.slave, 0x11);
         match frame.pdu {
-            ResponsePDU::Exception { function, code } => {
+            ResponsePdu::Exception { function, code } => {
                 assert_eq!(function, 0x83);
                 assert_eq!(code, Code::IllegalFunction);
             }

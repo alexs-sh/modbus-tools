@@ -1,4 +1,4 @@
-use super::common;
+use crate::common;
 use byteorder::ReadBytesExt;
 use bytes::Buf;
 use std::cell::RefCell;
@@ -25,22 +25,22 @@ impl Bytes for &[u8] {
     }
 }
 
-pub struct CursorBytes<'a, 'b> {
+pub struct BytesCursor<'a, 'b> {
     inner: RefCell<&'a mut Cursor<&'b [u8]>>,
     nobjs: u16,
 }
 
-impl<'a, 'b> CursorBytes<'a, 'b> {
-    pub fn new(cursor: &'a mut Cursor<&'b [u8]>, nobjs: u16) -> CursorBytes<'a, 'b> {
+impl<'a, 'b> BytesCursor<'a, 'b> {
+    pub fn new(cursor: &'a mut Cursor<&'b [u8]>, nobjs: u16) -> BytesCursor<'a, 'b> {
         assert!(cursor.remaining() >= nobjs as usize);
-        CursorBytes {
+        BytesCursor {
             inner: RefCell::new(cursor),
             nobjs,
         }
     }
 }
 
-impl<'a, 'b> Bytes for CursorBytes<'a, 'b> {
+impl<'a, 'b> Bytes for BytesCursor<'a, 'b> {
     fn bytes_write(&self, dst: &mut [u8]) -> u16 {
         let slen = self.nobjs as usize;
         let dlen = dst.len();
@@ -81,7 +81,7 @@ mod test {
         let input = [1u8, 2, 3, 4];
         let mut output = [0u8; 4];
         let mut cursor = Cursor::new(&input[..]);
-        let bs = CursorBytes::new(&mut cursor, 4);
+        let bs = BytesCursor::new(&mut cursor, 4);
         assert_eq!(bs.bytes_count(), 4);
         let res = bs.bytes_write(&mut output[..]);
         assert_eq!(res, 4);
