@@ -97,7 +97,7 @@ fn read_args() -> Option<Settings> {
 
     if arg == "--help" || arg == "-h" {
         println!(
-            r#"slave_rnd [address]
+            r#"slave-rnd [address]
 
 Parameters:
     address - optional parameter for binding server socket. 0.0.0.0:502 by default
@@ -106,11 +106,14 @@ Env. variables:
     RUST_LOG - changes output verbosity. Values [error,warn,info,debug,trace]. info by default
 
 Examples:
-    slave_rnd - run with default parameters
+    slave-rnd - run with default parameters
 
-    RUST_LOG=debug slave_rnd - run app with extended output
+    RUST_LOG=debug slave-rnd - run app with extended output
 
-    slave_rnd 0.0.0.0:8888 - run app on port 8888"#
+    slave-rnd tcp:0.0.0.0:8888 - run app on port 8888. TCP mode.
+
+    slave-rnd udp:0.0.0.0:8888 - run app on port 8888. UDP mode.
+    "#
         );
         None
     } else {
