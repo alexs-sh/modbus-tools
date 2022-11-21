@@ -1,36 +1,155 @@
-//use byteorder::{BigEndian, NativeEndian, ReadBytesExt, WriteBytesExt};
+use crate::{error::Error, pdu::PduRequestCodec, pdu::PduResponseCodec};
+use bytes::{Buf, BufMut, BytesMut};
+use frame::{
+    request::{RequestFrame, RequestPdu},
+    response::{ResponseFrame, ResponsePdu},
+};
 
-//extern crate protocol;
-//use crate::common::error::CodecError;
-//use protocol::frame::request::RequestFrame;
-//use bytes::BytesMut;
-//use tokio_util::codec::Decoder;
-//
-//pub(crate) struct RequestDecoder;
-//pub(crate) struct ResponseEncoder;
-//
-//impl Decoder for RequestDecoder {
-//    type Item = RequestFrame;
-//    type Error = CodecError;
-//
-//    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-//        let len = src.len();
-//
-//        // At least slave and func
-//        if len < 2 {
-//            return Ok(None);
-//        }
-//
-//        //let slave = src[0];
-//        //let func = src[1];
-//
-//        //let address = NetworkEndian::read_u16(&src[2..4]);
-//
-//        Ok(None)
-//    }
-//}
-//
+use byteorder::{BigEndian, NativeEndian, WriteBytesExt};
+use std::io::Cursor;
+use std::io::Read;
+use tokio_util::codec::{Decoder, Encoder};
+pub type RTURequest = RequestFrame;
+pub type RTUResponse = ResponseFrame;
 
+pub struct RTUCodec {
+    slave: Option<u8>,
+    request: Option<RequestPdu>,
+    crc: u16,
+}
+
+impl RTUCodec {
+    fn new() -> RTUCodec {
+        RTUCodec {
+            slave: None,
+            request: None,
+            crc: 0x0,
+        }
+    }
+
+    fn update_crc(&mut self, bytes: &[u8]) -> u16 {
+        self.crc = calc_crc_inner(self.crc, &bytes[..]);
+        self.get_crc()
+    }
+
+    fn start_crc(&mut self) {
+        self.crc = 0xFFFF;
+    }
+
+    fn get_crc(&self) -> u16 {
+        u16::from_be(self.crc)
+    }
+
+    fn reset(&mut self) {
+        self.slave = None;
+        self.request = None;
+        self.crc = 0;
+    }
+
+    fn encode_slave(&mut self, slave: u8, dst: &mut BytesMut) -> Result<(), Error> {
+        let dst = &mut Cursor::new(dst.as_mut());
+        dst.write_u8(slave)?;
+        Ok(())
+    }
+
+    fn encode_crc(&mut self, crc: u16, dst: &mut BytesMut) -> Result<(), Error> {
+        let dst = &mut Cursor::new(dst.as_mut());
+        dst.write_u16::<NativeEndian>(crc)?;
+        Ok(())
+    }
+
+    fn decode_slave(&mut self, src: &mut BytesMut) -> Result<Option<RTURequest>, Error> {
+        if self.slave.is_none() && !src.is_empty() {
+            let slave = src[0];
+            self.slave = Some(slave);
+            self.update_crc(&[slave]);
+            src.advance(1);
+        }
+        Ok(None)
+    }
+
+    fn decode_pdu(&mut self, src: &mut BytesMut) -> Result<Option<RTURequest>, Error> {
+        if self.slave.is_some() && self.request.is_none() {
+            if let Some(pdu) = PduRequestCodec::default().decode(src)? {
+                self.update_crc(&src.as_ref()[..pdu.len()]);
+                src.advance(pdu.len());
+                self.request = Some(pdu);
+            }
+        }
+        Ok(None)
+    }
+
+    fn decode_crc(&mut self, src: &mut BytesMut) -> Result<Option<RTURequest>, Error> {
+        if self.slave.is_some() && self.request.is_some() && src.len() >= 2 {
+            let result = if self.update_crc(&src.as_ref()[..2]) == 0 {
+                let request = RequestFrame {
+                    slave: self.slave.take().unwrap(),
+                    pdu: self.request.take().unwrap(),
+                };
+                Ok(Some(request))
+            } else {
+                Err(Error::InvalidData)
+            };
+
+            src.advance(2);
+            result
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+impl Decoder for RTUCodec {
+    type Item = RTURequest;
+    type Error = Error;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        if self.slave.is_none() {
+            self.start_crc();
+        }
+
+        let result = self
+            .decode_slave(src)
+            .and_then(|_| self.decode_pdu(src))
+            .and_then(|_| self.decode_crc(src));
+
+        match result {
+            Ok(None) => {}
+            _ => self.reset(),
+        }
+
+        result
+    }
+}
+
+impl Encoder<RTUResponse> for RTUCodec {
+    type Error = Error;
+    fn encode(&mut self, msg: RTUResponse, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let pdu_len = msg.pdu.len();
+        let full_len = pdu_len + 3;
+        dst.resize(full_len, 0);
+
+        let mut crc = dst.split_off(full_len - 2);
+        let mut body = dst.split_off(1);
+        let mut head = dst.split_off(0);
+        let result = self
+            .encode_slave(msg.slave, &mut head)
+            .and_then(|_| PduResponseCodec::default().encode(msg.pdu, &mut body))
+            .and_then(|_| {
+                let mut crc_val = 0xFFFF;
+                crc_val = calc_crc_inner(crc_val, &head);
+                crc_val = calc_crc_inner(crc_val, &body);
+                self.encode_crc(crc_val, &mut crc)
+            });
+
+        self.reset();
+        dst.unsplit(head);
+        dst.unsplit(body);
+        dst.unsplit(crc);
+
+        result
+    }
+}
 const CRC16: [u16; 256] = [
     0x0000u16, 0xc0c1, 0xc181, 0x0140, 0xc301, 0x03c0, 0x0280, 0xc241, 0xc601, 0x06c0, 0x0780,
     0xc741, 0x0500, 0xc5c1, 0xc481, 0x0440, 0xcc01, 0x0cc0, 0x0d80, 0xcd41, 0x0f00, 0xcfc1, 0xce81,
@@ -57,22 +176,140 @@ const CRC16: [u16; 256] = [
 ];
 
 fn calc_crc(bytes: &[u8]) -> u16 {
-    let mut crc: u16 = 0xFFFF;
-    for byte in bytes {
-        let idx = ((crc ^ (*byte as u16)) & 0xFF) as usize;
-        crc = crc >> 8 ^ CRC16[idx];
-    }
+    let crc = calc_crc_inner(0xFFFF, bytes);
     u16::from_be(crc)
+}
+
+fn calc_crc_inner(crc: u16, bytes: &[u8]) -> u16 {
+    let mut new_crc = crc;
+    for byte in bytes {
+        let idx = ((new_crc ^ (*byte as u16)) & 0xFF) as usize;
+        new_crc = new_crc >> 8 ^ CRC16[idx];
+    }
+    new_crc
 }
 
 #[cfg(test)]
 mod test {
     use super::calc_crc;
-
+    use super::RTUCodec;
+    use super::RTURequest;
+    use super::RTUResponse;
+    use bytes::{Buf, BytesMut};
+    use frame::data::coils::CoilsSlice;
+    use frame::request::RequestPdu;
+    use frame::response::ResponsePdu;
+    use tokio_util::codec::{Decoder, Encoder};
     #[test]
     fn crc_values() {
-        let input = [0x11, 0x01, 0x00, 0x13, 0x00, 0x25 /*0E84*/];
-        let crc = calc_crc(&input);
-        assert_eq!(crc, 0x0E84);
+        let input = [
+            (vec![0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25 /*0E84*/], 0x0E84),
+            (vec![0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25, 0x0E, 0x84], 0x0),
+            (vec![0x11, 0x04, 0x00, 0x08, 0x00, 0x01, 0xB2, 0x98], 0x0),
+        ];
+
+        for (data, crc) in input {
+            assert_eq!(calc_crc(data.as_ref()), crc);
+        }
+    }
+
+    #[test]
+    fn crc_values_codec() {
+        let input = [
+            (vec![0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25 /*0E84*/], 0x0E84),
+            (vec![0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25, 0x0E, 0x84], 0x0),
+            (vec![0x11, 0x04, 0x00, 0x08, 0x00, 0x01, 0xB2, 0x98], 0x0),
+        ];
+
+        for (data, crc) in input {
+            let mut codec = RTUCodec::new();
+            codec.start_crc();
+            codec.update_crc(data.as_ref());
+            assert_eq!(calc_crc(data.as_ref()), crc);
+        }
+    }
+
+    #[test]
+    fn crc_values_codec_step() {
+        let input = [0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25 /*0E84*/];
+        let mut codec = RTUCodec::new();
+        codec.start_crc();
+        for b in input {
+            codec.update_crc(&[b]);
+        }
+        assert_eq!(codec.get_crc(), 0x0E84);
+    }
+
+    #[test]
+    fn decode_fc1() {
+        let input = [0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25, 0x0E, 0x84];
+        let mut buffer = BytesMut::from(&input[..]);
+        let mut codec = RTUCodec::new();
+        let msg = codec.decode(&mut buffer).unwrap().unwrap();
+        match msg.pdu {
+            RequestPdu::ReadCoils { address, nobjs } => {
+                assert_eq!(address, 0x13);
+                assert_eq!(nobjs, 0x25);
+            }
+            _ => unimplemented!(),
+        }
+        assert_eq!(buffer.len(), 0);
+    }
+    #[test]
+    fn decode_fc1_crc_err() {
+        let input = [0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25, 0x1E, 0x84];
+        let mut buffer = BytesMut::from(&input[..]);
+        let mut codec = RTUCodec::new();
+        let msg = codec.decode(&mut buffer);
+        match msg {
+            Err(_) => {}
+            _ => unimplemented!(),
+        }
+        assert_eq!(buffer.len(), 0);
+    }
+    #[test]
+    fn decode_fc1_part() {
+        let input = [0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25, 0x0E];
+        let mut buffer = BytesMut::from(&input[..]);
+        let mut codec = RTUCodec::new();
+        let msg = codec.decode(&mut buffer).unwrap();
+        match msg {
+            None => (),
+            _ => unimplemented!(),
+        }
+        assert_eq!(buffer.len(), 1);
+    }
+    #[test]
+    fn decode_fc1_2x() {
+        let input = [
+            0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25, 0x0E, 0x84, 0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25,
+            0x0E, 0x84,
+        ];
+        let mut buffer = BytesMut::from(&input[..]);
+        let mut codec = RTUCodec::new();
+        for i in 0..2 {
+            let msg = codec.decode(&mut buffer).unwrap().unwrap();
+            match msg.pdu {
+                RequestPdu::ReadCoils { address, nobjs } => {
+                    assert_eq!(address, 0x13);
+                    assert_eq!(nobjs, 0x25);
+                }
+                _ => unimplemented!(),
+            }
+            assert_eq!(buffer.len(), 16 - (i + 1) * 8);
+        }
+    }
+    #[test]
+    fn encode_fc1() {
+        let control = [0x11u8, 0x01, 0x05, 0xCD, 0x6B, 0xB2, 0x0E, 0x1B, 0x45, 0xE6];
+        let mut buffer = BytesMut::with_capacity(512);
+        let mut codec = RTUCodec::new();
+        let msg = RTUResponse::new(
+            0x11,
+            ResponsePdu::read_coils(CoilsSlice::new(&[0xCDu8, 0x6B, 0xB2, 0x0E, 0x1B], 37)),
+        );
+        codec.encode(msg, &mut buffer).unwrap();
+        assert_eq!(10, buffer.chunk().len());
+        assert_eq!(control, buffer.chunk());
     }
 }

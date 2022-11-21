@@ -153,6 +153,23 @@ impl RequestPdu {
             data,
         }
     }
+
+    pub fn len(&self) -> usize {
+        match self {
+            RequestPdu::ReadCoils { .. }
+            | RequestPdu::ReadDiscreteInputs { .. }
+            | RequestPdu::ReadHoldingRegisters { .. }
+            | RequestPdu::ReadInputRegisters { .. }
+            | RequestPdu::WriteSingleCoil { .. }
+            | RequestPdu::WriteSingleRegister { .. } => 5,
+
+            RequestPdu::WriteMultipleCoils { data, .. }
+            | RequestPdu::WriteMultipleRegisters { data, .. } => 6 + data.len(),
+
+            RequestPdu::EncapsulatedInterfaceTransport { data, .. } => 2 + data.len(),
+            RequestPdu::Raw { data, .. } => 1 + data.len(),
+        }
+    }
 }
 
 #[cfg(test)]
