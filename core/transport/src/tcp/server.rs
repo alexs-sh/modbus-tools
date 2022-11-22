@@ -1,3 +1,8 @@
+extern crate codec;
+extern crate frame;
+use crate::{settings::Settings, Handler, Request, Response};
+use codec::net::tcp::TcpCodec;
+use frame::{RequestFrame, ResponseFrame};
 use futures::{SinkExt, StreamExt};
 use log::{debug, error, info, warn};
 use std::io::Error;
@@ -5,10 +10,6 @@ use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio_util::codec::Framed;
-extern crate codec;
-extern crate frame;
-use crate::{settings::Settings, Handler, Request, Response};
-use codec::tcp::{TcpCodec, TcpRequest, TcpResponse};
 use uuid::{self, Uuid};
 
 struct MsgInfo {
@@ -79,19 +80,21 @@ impl Client {
                 response.uuid, self.address, response.payload
             );
 
-            let response = TcpResponse::new(info.mbid, response.payload);
+            let response =
+                ResponseFrame::from_parts(info.mbid, response.payload.slave, response.payload.pdu);
+
             let _ = self.io.send(response).await;
         } else {
             warn!("invalid/expired uuid:{}", response.uuid);
         }
     }
 
-    async fn start_request(&mut self, request: TcpRequest) {
+    async fn start_request(&mut self, request: RequestFrame) {
         let uuid = Uuid::new_v4();
         let mbid = request.id;
         let request = Request {
             uuid,
-            payload: request.frame,
+            payload: request,
             response_tx: Some(self.response_tx.clone()),
         };
 

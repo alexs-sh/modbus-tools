@@ -3,8 +3,7 @@ pub mod settings;
 pub mod tcp;
 pub mod udp;
 
-use frame::request::RequestFrame;
-use frame::response::ResponseFrame;
+use frame::{RequestFrame, ResponseFrame};
 use futures::Stream;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;

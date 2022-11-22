@@ -1,214 +1,52 @@
-use super::data::{Coils, Data, Registers};
-use super::{common, exception::Code};
+use super::pdu::{RequestPdu, ResponsePdu};
 
 #[derive(Debug, PartialEq)]
-pub enum ResponsePdu {
-    /// 0x1
-    ReadCoils {
-        nobjs: u16,
-        data: Data,
-    },
+pub struct RequestFrame {
+    pub id: u16,
+    pub slave: u8,
+    pub pdu: RequestPdu,
+}
 
-    /// 0x2
-    ReadDiscreteInputs {
-        nobjs: u16,
-        data: Data,
-    },
+impl RequestFrame {
+    pub fn new(slave: u8, pdu: RequestPdu) -> RequestFrame {
+        RequestFrame { id: 0, slave, pdu }
+    }
 
-    /// 0x3
-    ReadHoldingRegisters {
-        nobjs: u16,
-        data: Data,
-    },
-
-    /// 0x4
-    ReadInputRegisters {
-        nobjs: u16,
-        data: Data,
-    },
-
-    /// 0x5
-    WriteSingleCoil {
-        address: u16,
-        value: bool,
-    },
-
-    /// 0x6
-    WriteSingleRegister {
-        address: u16,
-        value: u16,
-    },
-
-    /// 0xF
-    WriteMultipleCoils {
-        address: u16,
-        nobjs: u16,
-    },
-
-    /// 0x10
-    WriteMultipleRegisters {
-        address: u16,
-        nobjs: u16,
-    },
-
-    /// 0x2b
-    EncapsulatedInterfaceTransport {
-        mei_type: u8,
-        data: Data,
-    },
-
-    Raw {
-        function: u8,
-        data: Data,
-    },
-
-    /// Exception,
-    Exception {
-        function: u8,
-        code: Code,
-    },
+    pub fn from_parts(id: u16, slave: u8, pdu: RequestPdu) -> RequestFrame {
+        RequestFrame { id, slave, pdu }
+    }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct ResponseFrame {
+    pub id: u16,
     pub slave: u8,
     pub pdu: ResponsePdu,
 }
 
 impl ResponseFrame {
     pub fn new(slave: u8, pdu: ResponsePdu) -> ResponseFrame {
-        ResponseFrame { slave, pdu }
+        ResponseFrame { id: 0, slave, pdu }
     }
-}
-
-impl ResponsePdu {
-    pub fn len(&self) -> usize {
-        match self {
-            ResponsePdu::ReadCoils { data, .. }
-            | ResponsePdu::ReadDiscreteInputs { data, .. }
-            | ResponsePdu::ReadHoldingRegisters { data, .. }
-            | ResponsePdu::ReadInputRegisters { data, .. } => 2 + data.len(),
-            ResponsePdu::WriteSingleCoil { .. }
-            | ResponsePdu::WriteSingleRegister { .. }
-            | ResponsePdu::WriteMultipleCoils { .. }
-            | ResponsePdu::WriteMultipleRegisters { .. } => 5,
-            ResponsePdu::EncapsulatedInterfaceTransport { data, .. } => 2 + data.len(),
-            ResponsePdu::Raw { data, .. } => 1 + data.len(),
-            ResponsePdu::Exception { .. } => 2,
-        }
-    }
-}
-
-impl ResponsePdu {
-    /// 0x1
-    pub fn read_coils(coils: impl Coils) -> ResponsePdu {
-        ResponsePdu::read_coils_inner(1, coils)
-    }
-
-    /// 0x2
-    pub fn read_discrete_inputs(coils: impl Coils) -> ResponsePdu {
-        ResponsePdu::read_coils_inner(2, coils)
-    }
-
-    /// 0x3
-    pub fn read_holding_registers(registers: impl Registers) -> ResponsePdu {
-        ResponsePdu::read_registers_inner(3, registers)
-    }
-
-    /// 0x4
-    pub fn read_input_registers(registers: impl Registers) -> ResponsePdu {
-        ResponsePdu::read_registers_inner(4, registers)
-    }
-
-    /// 0x5
-    pub fn write_single_coil(address: u16, value: bool) -> ResponsePdu {
-        ResponsePdu::WriteSingleCoil { address, value }
-    }
-
-    /// 0x6
-    pub fn write_single_register(address: u16, value: u16) -> ResponsePdu {
-        ResponsePdu::WriteSingleRegister { address, value }
-    }
-
-    /// 0xF
-    pub fn write_multiple_coils(address: u16, nobjs: u16) -> ResponsePdu {
-        assert!(common::ncoils_check(nobjs));
-        ResponsePdu::WriteMultipleCoils { address, nobjs }
-    }
-
-    /// 0x10
-    pub fn write_multiple_registers(address: u16, nobjs: u16) -> ResponsePdu {
-        assert!(common::nregs_check(nobjs));
-        ResponsePdu::WriteMultipleRegisters { address, nobjs }
-    }
-
-    /// 0x2b
-    pub fn encapsulated_interface_transport(mei_type: u8, data: &[u8]) -> ResponsePdu {
-        assert!(common::data_bytes_check(data.len()));
-        ResponsePdu::EncapsulatedInterfaceTransport {
-            mei_type,
-            data: Data::raw(data),
-        }
-    }
-
-    /// make response with exception
-    pub fn exception(func: u8, code: Code) -> ResponsePdu {
-        ResponsePdu::Exception {
-            function: func | 0x80,
-            code,
-        }
-    }
-
-    /// raw
-    pub fn raw(func: u8, data: Data) -> ResponsePdu {
-        ResponsePdu::Raw {
-            function: func,
-            data,
-        }
-    }
-
-    fn read_coils_inner(func: u8, coils: impl Coils) -> ResponsePdu {
-        let nobjs = coils.coils_count();
-
-        assert!(common::ncoils_check(nobjs));
-        assert!(func == 0x1 || func == 0x2);
-
-        match func {
-            0x1 => ResponsePdu::ReadCoils {
-                nobjs,
-                data: Data::coils(coils),
-            },
-            0x2 => ResponsePdu::ReadDiscreteInputs {
-                nobjs,
-                data: Data::coils(coils),
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    fn read_registers_inner(func: u8, registers: impl Registers) -> ResponsePdu {
-        let nobjs = registers.registers_count();
-        assert!(common::nregs_check(nobjs));
-        assert!(func == 0x3 || func == 0x4);
-
-        match func {
-            0x3 => ResponsePdu::ReadHoldingRegisters {
-                nobjs,
-                data: Data::registers(registers),
-            },
-            0x4 => ResponsePdu::ReadInputRegisters {
-                nobjs,
-                data: Data::registers(registers),
-            },
-            _ => unreachable!(),
-        }
+    pub fn from_parts(id: u16, slave: u8, pdu: ResponsePdu) -> ResponseFrame {
+        ResponseFrame { id, slave, pdu }
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::common;
+    use crate::{common, exception::Code};
+
+    #[test]
+    fn create_frame() {
+        let frame = RequestFrame::new(0x11, RequestPdu::read_coils(1, 1));
+        assert_eq!(frame.slave, 0x11);
+        match frame.pdu {
+            RequestPdu::ReadCoils { .. } => {}
+            _ => unreachable!(),
+        }
+    }
 
     #[test]
     fn build_fc1_response_builder() {

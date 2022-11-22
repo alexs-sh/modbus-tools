@@ -1,16 +1,10 @@
 use crate::{error::Error, pdu::PduRequestCodec, pdu::PduResponseCodec};
-use bytes::{Buf, BufMut, BytesMut};
-use frame::{
-    request::{RequestFrame, RequestPdu},
-    response::{ResponseFrame, ResponsePdu},
-};
+use bytes::{Buf, BytesMut};
+use frame::{RequestFrame, RequestPdu, ResponseFrame};
 
-use byteorder::{BigEndian, NativeEndian, WriteBytesExt};
+use byteorder::{NativeEndian, WriteBytesExt};
 use std::io::Cursor;
-use std::io::Read;
 use tokio_util::codec::{Decoder, Encoder};
-pub type RTURequest = RequestFrame;
-pub type RTUResponse = ResponseFrame;
 
 pub struct RTUCodec {
     slave: Option<u8>,
@@ -28,7 +22,7 @@ impl RTUCodec {
     }
 
     fn update_crc(&mut self, bytes: &[u8]) -> u16 {
-        self.crc = calc_crc_inner(self.crc, &bytes[..]);
+        self.crc = calc_crc_inner(self.crc, bytes);
         self.get_crc()
     }
 
@@ -58,7 +52,7 @@ impl RTUCodec {
         Ok(())
     }
 
-    fn decode_slave(&mut self, src: &mut BytesMut) -> Result<Option<RTURequest>, Error> {
+    fn decode_slave(&mut self, src: &mut BytesMut) -> Result<Option<RequestFrame>, Error> {
         if self.slave.is_none() && !src.is_empty() {
             let slave = src[0];
             self.slave = Some(slave);
@@ -68,7 +62,7 @@ impl RTUCodec {
         Ok(None)
     }
 
-    fn decode_pdu(&mut self, src: &mut BytesMut) -> Result<Option<RTURequest>, Error> {
+    fn decode_pdu(&mut self, src: &mut BytesMut) -> Result<Option<RequestFrame>, Error> {
         if self.slave.is_some() && self.request.is_none() {
             if let Some(pdu) = PduRequestCodec::default().decode(src)? {
                 self.update_crc(&src.as_ref()[..pdu.len()]);
@@ -79,13 +73,11 @@ impl RTUCodec {
         Ok(None)
     }
 
-    fn decode_crc(&mut self, src: &mut BytesMut) -> Result<Option<RTURequest>, Error> {
+    fn decode_crc(&mut self, src: &mut BytesMut) -> Result<Option<RequestFrame>, Error> {
         if self.slave.is_some() && self.request.is_some() && src.len() >= 2 {
             let result = if self.update_crc(&src.as_ref()[..2]) == 0 {
-                let request = RequestFrame {
-                    slave: self.slave.take().unwrap(),
-                    pdu: self.request.take().unwrap(),
-                };
+                let request =
+                    RequestFrame::new(self.slave.take().unwrap(), self.request.take().unwrap());
                 Ok(Some(request))
             } else {
                 Err(Error::InvalidData)
@@ -100,7 +92,7 @@ impl RTUCodec {
 }
 
 impl Decoder for RTUCodec {
-    type Item = RTURequest;
+    type Item = RequestFrame;
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -122,9 +114,9 @@ impl Decoder for RTUCodec {
     }
 }
 
-impl Encoder<RTUResponse> for RTUCodec {
+impl Encoder<ResponseFrame> for RTUCodec {
     type Error = Error;
-    fn encode(&mut self, msg: RTUResponse, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, msg: ResponseFrame, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let pdu_len = msg.pdu.len();
         let full_len = pdu_len + 3;
         dst.resize(full_len, 0);
@@ -193,12 +185,10 @@ fn calc_crc_inner(crc: u16, bytes: &[u8]) -> u16 {
 mod test {
     use super::calc_crc;
     use super::RTUCodec;
-    use super::RTURequest;
-    use super::RTUResponse;
+    use super::ResponseFrame;
     use bytes::{Buf, BytesMut};
     use frame::data::coils::CoilsSlice;
-    use frame::request::RequestPdu;
-    use frame::response::ResponsePdu;
+    use frame::{RequestPdu, ResponsePdu};
     use tokio_util::codec::{Decoder, Encoder};
     #[test]
     fn crc_values() {
@@ -304,7 +294,7 @@ mod test {
         let control = [0x11u8, 0x01, 0x05, 0xCD, 0x6B, 0xB2, 0x0E, 0x1B, 0x45, 0xE6];
         let mut buffer = BytesMut::with_capacity(512);
         let mut codec = RTUCodec::new();
-        let msg = RTUResponse::new(
+        let msg = ResponseFrame::new(
             0x11,
             ResponsePdu::read_coils(CoilsSlice::new(&[0xCDu8, 0x6B, 0xB2, 0x0E, 0x1B], 37)),
         );

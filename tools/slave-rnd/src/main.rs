@@ -1,8 +1,9 @@
+extern crate frame;
+extern crate transport;
+
 use env_logger::Builder;
 use frame::exception::Code;
-use frame::request::{RequestFrame, RequestPdu};
-use frame::response::{ResponseFrame, ResponsePdu};
-use frame::{MAX_NCOILS, MAX_NREGS};
+use frame::{RequestFrame, RequestPdu, ResponseFrame, ResponsePdu, MAX_NCOILS, MAX_NREGS};
 use futures::{Stream, StreamExt};
 use log::{info, LevelFilter};
 use tokio::signal;
@@ -12,9 +13,6 @@ use std::env;
 use std::str::FromStr;
 use transport::builder;
 use transport::{settings::Settings, settings::TransportAddress, Response};
-
-extern crate frame;
-extern crate transport;
 
 fn fill_registers(registers: &mut [u16]) {
     for item in registers.iter_mut() {

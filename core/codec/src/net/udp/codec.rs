@@ -1,12 +1,10 @@
 extern crate frame;
 use crate::error::Error;
-use crate::net::{NetCodec, NetRequest, NetResponse};
+use crate::net::inner::codec::NetCodec;
 use bytes::BytesMut;
+use frame::{RequestFrame, ResponseFrame};
 use log::error;
 use tokio_util::codec::{Decoder, Encoder};
-
-pub type UdpRequest = NetRequest;
-pub type UdpResponse = NetResponse;
 
 pub struct UdpCodec {
     codec: NetCodec,
@@ -27,7 +25,7 @@ impl Default for UdpCodec {
 }
 
 impl Decoder for UdpCodec {
-    type Item = UdpRequest;
+    type Item = RequestFrame;
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -44,9 +42,9 @@ impl Decoder for UdpCodec {
     }
 }
 
-impl Encoder<UdpResponse> for UdpCodec {
+impl Encoder<ResponseFrame> for UdpCodec {
     type Error = Error;
-    fn encode(&mut self, msg: UdpResponse, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, msg: ResponseFrame, dst: &mut BytesMut) -> Result<(), Self::Error> {
         self.codec.encode(msg, dst)
     }
 }

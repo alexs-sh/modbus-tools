@@ -1,3 +1,10 @@
+extern crate codec;
+extern crate frame;
+
+use super::queue::FixedQueue;
+use crate::{settings::Settings, Handler, Request, Response};
+use codec::net::udp::UdpCodec;
+use frame::{RequestFrame, ResponseFrame};
 use futures::{SinkExt, StreamExt};
 use log::{debug, warn};
 use std::io::Error;
@@ -5,11 +12,6 @@ use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 use tokio_util::udp::UdpFramed;
-extern crate codec;
-extern crate frame;
-use super::queue::FixedQueue;
-use crate::{settings::Settings, Handler, Request, Response};
-use codec::udp::{UdpCodec, UdpRequest, UdpResponse};
 use uuid::{self, Uuid};
 
 struct MsgInfo {
@@ -80,7 +82,7 @@ impl UdpServer {
         true
     }
 
-    async fn start_request(&mut self, request: UdpRequest, address: SocketAddr) {
+    async fn start_request(&mut self, request: RequestFrame, address: SocketAddr) {
         let uuid = Uuid::new_v4();
         let info = MsgInfo {
             uuid,
@@ -91,7 +93,7 @@ impl UdpServer {
 
         let request = Request {
             uuid,
-            payload: request.frame,
+            payload: request,
             response_tx: Some(self.response_tx.clone()),
         };
         debug!(
@@ -108,7 +110,8 @@ impl UdpServer {
                 response.uuid, info.address, response.payload
             );
             let id = info.mbid;
-            let response = UdpResponse::new(id, response.payload);
+            let response =
+                ResponseFrame::from_parts(id, response.payload.slave, response.payload.pdu);
             let _ = self.io.send((response, info.address)).await;
         } else {
             warn!("invalid/expired uuid:{}", response.uuid);
