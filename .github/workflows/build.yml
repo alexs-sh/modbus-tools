@@ -1,0 +1,28 @@
+name: Build
+on: [push]
+jobs:
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          components: rustfmt, rust-src
+
+      - name: Install packages
+        run: sudo apt update -y && sudo apt install -y gcc curl bzip2 lcov libssl-dev pkg-config
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Test
+        run: cargo test --release
+
+      - name: Clippy
+        run: cargo clippy
