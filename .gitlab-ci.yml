@@ -52,7 +52,7 @@ aarch64-debian:11:
     name: ${CI_JOB_NAME}-${CI_COMMIT_SHA}
     expire_in: 1 days
     paths:
-    - target/aarch64-unknown-linux-gnueabihf/release/slave*
+    - target/aarch64-unknown-linux-gnu/release/slave*
   tags:
     - docker
 
