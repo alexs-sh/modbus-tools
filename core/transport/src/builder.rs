@@ -1,4 +1,5 @@
 use crate::{
+    rtu::port::RtuPort,
     settings::{Settings, TransportAddress},
     tcp::server::TcpServer,
     udp::server::UdpServer,
@@ -21,6 +22,10 @@ pub async fn build(settings: Settings) -> Result<impl Stream<Item = Request>, Er
             let handler = UdpServer::build(settings).await?;
             Ok(handler.to_stream())
         }
-        _ => unimplemented!(),
+        TransportAddress::Serial(address) => {
+            info!("start rtu slave {}", address);
+            let handler = RtuPort::build(settings).await?;
+            Ok(handler.to_stream())
+        }
     }
 }

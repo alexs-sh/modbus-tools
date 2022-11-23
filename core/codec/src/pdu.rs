@@ -29,9 +29,11 @@ impl Decoder for PduRequestCodec {
                 Ok(Some(RequestPdu::read_discrete_inputs(v1, v2)))
             }),
             0x3 => prefix_from_cursor(src).map_or(Ok(None), |(v1, v2)| {
+                check_nregs(v2)?;
                 Ok(Some(RequestPdu::read_holding_registers(v1, v2)))
             }),
             0x4 => prefix_from_cursor(src).map_or(Ok(None), |(v1, v2)| {
+                check_nregs(v2)?;
                 Ok(Some(RequestPdu::read_input_registers(v1, v2)))
             }),
             0x5 => prefix_from_cursor(src).map_or(Ok(None), |(v1, v2)| {

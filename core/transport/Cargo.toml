@@ -11,6 +11,7 @@ frame = { path = "../../core/frame" }
 tokio = {version = "1.19.2", features = ["full"]}
 tokio-util = { version = "0.7.3", features = ["net", "codec"]}
 tokio-stream = { version = "0.1.9" }
+tokio-serial = "5.4.4"
 futures = { version = "0.3.21" }
 log = { version = "0.4.17" }
 uuid = { version = "1.1.2", features = [ "v4", "fast-rng" ] }

@@ -1,4 +1,5 @@
 pub mod builder;
+pub mod rtu;
 pub mod settings;
 pub mod tcp;
 pub mod udp;
