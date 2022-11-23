@@ -20,6 +20,12 @@ implementations, etc.
 
 ![](docs/pics/mbpoll.gif)
 
+Supported transport: 
+
+- [x] TCP
+- [x] UDP
+- [x] Serial
+
 Supported functions: 
 
 - [x] 0x01 Read Coils
@@ -43,12 +49,6 @@ Supported functions:
 - [ ] 0x2B/0x0D Encapsulated Interface Transport
 - [x] 0x2B/0x0E Encapsulated Interface Transport. Read Device Identification
 
-Supported transport: 
-
-- [x] TCP
-- [x] UDP
-- [ ] Serial
-
 #### Build & run
 
 The easiest way is to build and run via Cargo. By default, Modbus TCP uses 502
@@ -56,7 +56,7 @@ port that, in most cases, requires root privileges. Therefore all examples are
 presented on port 1502.
 
 ```
-cargo run -- "tcp:0.0.0.0:1502"
+cargo run -- tcp:0.0.0.0:1502
 ..
 [2022-07-08T14:49:25Z INFO  slave_rnd] start server 0.0.0.0:1502
 [2022-07-08T14:49:25Z INFO  slave_rnd] start message processor
@@ -68,7 +68,7 @@ cargo run -- "tcp:0.0.0.0:1502"
 Run with verbose output.
 
 ```
-RUST_LOG=debug cargo run -- "tcp:0.0.0.0:1502"
+RUST_LOG=debug cargo run -- tcp:0.0.0.0:1502
 ...
 [2022-07-08T14:50:16Z INFO  slave_rnd] start server 0.0.0.0:1502
 [2022-07-08T14:50:16Z INFO  slave_rnd] start message processor
@@ -80,6 +80,12 @@ RUST_LOG=debug cargo run -- "tcp:0.0.0.0:1502"
 [2022-07-08T14:50:17Z DEBUG codec::net::default] 127.0.0.1:56896 pack [0, 197, 0, 0, 0, 23, 1, 3, 20, 4, 145, 2, 173, 70, 122, 128, 61, 198, 56, 37, 89, 72, 62, 186, 5, 123, 233, 21, 79]
 [2022-07-08T14:50:17Z DEBUG codec::net::default] 127.0.0.1:56896 unpack [0, 198, 0, 0, 0, 6, 1, 3, 0, 0, 0, 10]
 ..
+```
+
+Run in serial mode.
+
+```
+cargo run -- serial:/dev/ttyUSB0:38400-8-N-1
 ```
 
 #### Cross-compile
