@@ -1,6 +1,6 @@
 use std::convert::From;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Code {
     IllegalFunction = 0x01,
     IllegalDataAddress = 0x02,

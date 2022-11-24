@@ -56,11 +56,8 @@ impl Client {
             },
 
             response = self.response_rx.recv() => {
-                match response {
-                    Some(response) => {
-                        self.send_response(response).await;
-                    }
-                    None => {}
+                if let Some(response) = response {
+                    self.send_response(response).await;
                 }
             }
         };

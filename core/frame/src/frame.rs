@@ -1,6 +1,6 @@
 use super::pdu::{RequestPdu, ResponsePdu};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct RequestFrame {
     pub id: u16,
     pub slave: u8,
@@ -17,7 +17,7 @@ impl RequestFrame {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ResponseFrame {
     pub id: u16,
     pub slave: u8,

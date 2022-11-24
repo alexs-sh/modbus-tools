@@ -1,7 +1,7 @@
 use super::data::{Bytes, Coils, Data, Registers};
 use super::{common, exception::Code};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum RequestPdu {
     /// 0x1
     ReadCoils {
@@ -160,7 +160,7 @@ impl RequestPdu {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ResponsePdu {
     /// 0x1
     ReadCoils {

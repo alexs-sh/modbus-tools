@@ -1,7 +1,7 @@
 use std::convert::From;
 use std::io;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Error {
     InvalidData,
     InvalidVersion,

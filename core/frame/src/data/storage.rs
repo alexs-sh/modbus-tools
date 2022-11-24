@@ -2,7 +2,7 @@ use super::{Coils, Registers};
 use crate::{common, MAX_DATA_SIZE};
 use smallvec::SmallVec;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct DataStorage {
     buffer: SmallVec<[u8; MAX_DATA_SIZE]>,
 }
