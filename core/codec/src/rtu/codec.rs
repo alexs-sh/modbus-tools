@@ -189,11 +189,6 @@ const CRC16: [u16; 256] = [
     0x8341, 0x4100, 0x81c1, 0x8081, 0x4040,
 ];
 
-fn calc_crc(bytes: &[u8]) -> u16 {
-    let crc = calc_crc_inner(0xFFFF, bytes);
-    u16::from_be(crc)
-}
-
 fn calc_crc_inner(crc: u16, bytes: &[u8]) -> u16 {
     let mut new_crc = crc;
     for byte in bytes {
@@ -205,25 +200,12 @@ fn calc_crc_inner(crc: u16, bytes: &[u8]) -> u16 {
 
 #[cfg(test)]
 mod test {
-    use super::calc_crc;
     use super::ResponseFrame;
     use super::RtuCodec;
     use bytes::{Buf, BytesMut};
     use frame::data::coils::CoilsSlice;
     use frame::{RequestPdu, ResponsePdu};
     use tokio_util::codec::{Decoder, Encoder};
-    #[test]
-    fn crc_values() {
-        let input = [
-            (vec![0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25 /*0E84*/], 0x0E84),
-            (vec![0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25, 0x0E, 0x84], 0x0),
-            (vec![0x11, 0x04, 0x00, 0x08, 0x00, 0x01, 0xB2, 0x98], 0x0),
-        ];
-
-        for (data, crc) in input {
-            assert_eq!(calc_crc(data.as_ref()), crc);
-        }
-    }
 
     #[test]
     fn crc_values_codec() {
@@ -237,7 +219,7 @@ mod test {
             let mut codec = RtuCodec::default();
             codec.start_crc();
             codec.update_crc(data.as_ref());
-            assert_eq!(calc_crc(data.as_ref()), crc);
+            assert_eq!(codec.get_crc(), crc);
         }
     }
 
