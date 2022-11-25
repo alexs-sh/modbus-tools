@@ -6,7 +6,7 @@ use crate::{
     Request,
 };
 
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use log::info;
 use std::io::Error;
 
@@ -28,4 +28,25 @@ pub async fn build(settings: Settings) -> Result<impl Stream<Item = Request>, Er
             Ok(handler.to_stream())
         }
     }
+}
+
+pub struct SlaveTransport {}
+
+//TODO:sas: For now, Fn handler is good enough. But it's a nice place for using Service
+pub async fn build_slave<H>(settings: Settings, handler: H) -> Result<SlaveTransport, Error>
+where
+    H: Fn(Request) + std::marker::Send + 'static,
+{
+    let mut stream = build(settings).await?;
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                    Some(request) = stream.next() => {
+                        handler(request);
+                }
+            }
+        }
+    });
+
+    Ok(SlaveTransport {})
 }

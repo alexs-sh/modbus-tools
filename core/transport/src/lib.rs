@@ -36,6 +36,10 @@ impl Response {
     pub async fn send(mut self) {
         self.response_tx.take().unwrap().send(self).await.unwrap();
     }
+
+    pub fn try_send(mut self) {
+        self.response_tx.take().unwrap().try_send(self).unwrap();
+    }
 }
 
 //Transport handler

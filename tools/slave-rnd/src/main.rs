@@ -4,7 +4,6 @@ extern crate transport;
 use env_logger::Builder;
 use frame::exception::Code;
 use frame::{RequestFrame, RequestPdu, ResponseFrame, ResponsePdu, MAX_NCOILS, MAX_NREGS};
-use futures::{Stream, StreamExt};
 use log::{info, LevelFilter};
 use tokio::signal;
 
@@ -123,26 +122,6 @@ Examples:
     }
 }
 
-fn init_processor<S>(mut input: S)
-where
-    S: Stream<Item = transport::Request> + std::marker::Unpin + std::marker::Send + 'static,
-{
-    info!("start message processor");
-    tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                Some(request) = input.next() => {
-                    let answer = make_answer(&request.payload);
-                    Response::make(
-                        request,
-                        answer
-                    ).send().await;
-                }
-            }
-        }
-    });
-}
-
 async fn wait_ctrl_c() {
     info!("press Ctrl+C to exit");
     let stop = signal::ctrl_c();
@@ -163,8 +142,11 @@ fn init_logger() {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(settings) = read_args() {
         init_logger();
-        let input = builder::build(settings).await?;
-        init_processor(input);
+        builder::build_slave(settings, |request| {
+            let answer = make_answer(&request.payload);
+            Response::make(request, answer).try_send();
+        })
+        .await?;
         wait_ctrl_c().await;
     }
     Ok(())
