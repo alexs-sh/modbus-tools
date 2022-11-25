@@ -3,10 +3,11 @@ extern crate frame;
 
 use super::port::{self, PortSettings};
 use crate::{settings::Settings, Handler, Request, Response};
+use codec::helpers;
 use codec::rtu::RtuCodec;
 use frame::{RequestFrame, ResponseFrame};
 use futures::{SinkExt, StreamExt};
-use log::{debug, error, warn};
+use log::{error, warn};
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 use tokio::sync::mpsc;
@@ -19,6 +20,7 @@ pub struct RtuSlaveChannel {
     request_tx: mpsc::Sender<Request>,
     response_tx: mpsc::Sender<Response>,
     response_rx: mpsc::Receiver<Response>,
+    name: String,
 }
 
 impl RtuSlaveChannel {
@@ -31,7 +33,7 @@ impl RtuSlaveChannel {
 
         let port = port::build(parameters)?;
 
-        let codec = RtuCodec::new();
+        let codec = RtuCodec::new(address);
         let io = Framed::new(port, codec);
 
         let (tx, rx) = mpsc::channel(settings.nmsg);
@@ -41,6 +43,7 @@ impl RtuSlaveChannel {
             request_tx: tx,
             response_tx,
             response_rx,
+            name: address.to_owned(),
         };
 
         let handler = Handler { request_rx: rx };
@@ -100,13 +103,17 @@ impl RtuSlaveChannel {
             payload: request,
             response_tx: Some(self.response_tx.clone()),
         };
-        debug!("recv request from serial: {:?}", request.payload);
+
+        helpers::log_frame(&self.name, &uuid, &request.payload);
+
         let _ = self.request_tx.send(request).await;
     }
 
     async fn send_response(&mut self, response: Response) {
-        debug!("send response to serial: {:?}", response.payload);
-        let response = ResponseFrame::from_parts(0, response.payload.slave, response.payload.pdu);
-        let _ = self.io.send(response).await;
+        let frame = ResponseFrame::from_parts(0, response.payload.slave, response.payload.pdu);
+
+        helpers::log_frame(&self.name, &response.uuid, &frame);
+
+        let _ = self.io.send(frame).await;
     }
 }

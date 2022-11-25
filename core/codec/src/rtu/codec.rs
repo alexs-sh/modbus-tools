@@ -1,4 +1,4 @@
-use crate::{error::Error, pdu::PduRequestCodec, pdu::PduResponseCodec};
+use crate::{error::Error, helpers, pdu::PduRequestCodec, pdu::PduResponseCodec};
 use bytes::{Buf, BytesMut};
 use frame::{RequestFrame, RequestPdu, ResponseFrame};
 
@@ -10,20 +10,22 @@ pub struct RtuCodec {
     slave: Option<u8>,
     request: Option<RequestPdu>,
     crc: u16,
+    name: String,
 }
 
 impl Default for RtuCodec {
     fn default() -> RtuCodec {
-        RtuCodec::new()
+        RtuCodec::new("serial")
     }
 }
 
 impl RtuCodec {
-    pub fn new() -> RtuCodec {
+    pub fn new(name: &str) -> RtuCodec {
         RtuCodec {
             slave: None,
             request: None,
             crc: 0x0,
+            name: name.to_owned(),
         }
     }
 
@@ -106,6 +108,8 @@ impl Decoder for RtuCodec {
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        helpers::log_data(&self.name, "in", src);
+
         if self.slave.is_none() {
             self.start_crc();
         }
@@ -154,6 +158,8 @@ impl Encoder<ResponseFrame> for RtuCodec {
         dst.unsplit(head);
         dst.unsplit(body);
         dst.unsplit(crc);
+
+        helpers::log_data(&self.name, "out", dst);
 
         result
     }
@@ -228,7 +234,7 @@ mod test {
         ];
 
         for (data, crc) in input {
-            let mut codec = RtuCodec::new();
+            let mut codec = RtuCodec::default();
             codec.start_crc();
             codec.update_crc(data.as_ref());
             assert_eq!(calc_crc(data.as_ref()), crc);
@@ -238,7 +244,7 @@ mod test {
     #[test]
     fn crc_values_codec_step() {
         let input = [0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25 /*0E84*/];
-        let mut codec = RtuCodec::new();
+        let mut codec = RtuCodec::default();
         codec.start_crc();
         for b in input {
             codec.update_crc(&[b]);
@@ -250,7 +256,7 @@ mod test {
     fn decode_fc1() {
         let input = [0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25, 0x0E, 0x84];
         let mut buffer = BytesMut::from(&input[..]);
-        let mut codec = RtuCodec::new();
+        let mut codec = RtuCodec::default();
         let msg = codec.decode(&mut buffer).unwrap().unwrap();
         match msg.pdu {
             RequestPdu::ReadCoils { address, nobjs } => {
@@ -265,7 +271,7 @@ mod test {
     fn decode_fc1_crc_err() {
         let input = [0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25, 0x1E, 0x84];
         let mut buffer = BytesMut::from(&input[..]);
-        let mut codec = RtuCodec::new();
+        let mut codec = RtuCodec::default();
         let msg = codec.decode(&mut buffer);
         match msg {
             Err(_) => {}
@@ -277,7 +283,7 @@ mod test {
     fn decode_fc1_part() {
         let input = [0x11u8, 0x01, 0x00, 0x13, 0x00, 0x25, 0x0E];
         let mut buffer = BytesMut::from(&input[..]);
-        let mut codec = RtuCodec::new();
+        let mut codec = RtuCodec::default();
         let msg = codec.decode(&mut buffer).unwrap();
         match msg {
             None => (),
@@ -292,7 +298,7 @@ mod test {
             0x0E, 0x84,
         ];
         let mut buffer = BytesMut::from(&input[..]);
-        let mut codec = RtuCodec::new();
+        let mut codec = RtuCodec::default();
         for i in 0..2 {
             let msg = codec.decode(&mut buffer).unwrap().unwrap();
             match msg.pdu {
@@ -309,7 +315,7 @@ mod test {
     fn encode_fc1() {
         let control = [0x11u8, 0x01, 0x05, 0xCD, 0x6B, 0xB2, 0x0E, 0x1B, 0x45, 0xE6];
         let mut buffer = BytesMut::with_capacity(512);
-        let mut codec = RtuCodec::new();
+        let mut codec = RtuCodec::default();
         let msg = ResponseFrame::new(
             0x11,
             ResponsePdu::read_coils(CoilsSlice::new(&[0xCDu8, 0x6B, 0xB2, 0x0E, 0x1B], 37)),

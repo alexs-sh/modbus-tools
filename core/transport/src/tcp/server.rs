@@ -1,10 +1,11 @@
 extern crate codec;
 extern crate frame;
 use crate::{settings::Settings, Handler, Request, Response};
+use codec::helpers;
 use codec::net::tcp::TcpCodec;
 use frame::{RequestFrame, ResponseFrame};
 use futures::{SinkExt, StreamExt};
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use std::io::Error;
 use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream};
@@ -72,10 +73,7 @@ impl Client {
         if resp_match {
             let info = self.wait_for.take().unwrap();
 
-            debug!(
-                "send response {} to {}: {:?}",
-                response.uuid, self.address, response.payload
-            );
+            helpers::log_frame(&self.address, &response.uuid, &response.payload);
 
             let response =
                 ResponseFrame::from_parts(info.mbid, response.payload.slave, response.payload.pdu);
@@ -95,10 +93,7 @@ impl Client {
             response_tx: Some(self.response_tx.clone()),
         };
 
-        debug!(
-            "recv request {} from {}: {:?}",
-            uuid, self.address, request.payload
-        );
+        helpers::log_frame(&self.address, &uuid, &request.payload);
 
         let _ = self.request_tx.send(request).await;
         if self.wait_for.is_some() {

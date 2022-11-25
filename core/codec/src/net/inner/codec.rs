@@ -1,9 +1,9 @@
 extern crate frame;
 use super::header::{Header, HeaderCodec};
+use crate::helpers;
 use crate::{error::Error, pdu::PduRequestCodec, pdu::PduResponseCodec};
 use bytes::{Buf, BytesMut};
 use frame::{RequestFrame, ResponseFrame, MBAP_HEADER_LEN};
-use log::debug;
 use tokio_util::codec::{Decoder, Encoder};
 
 pub struct NetCodec {
@@ -16,12 +16,6 @@ impl NetCodec {
         NetCodec {
             name: name.to_owned(),
             header: None,
-        }
-    }
-
-    fn log_bytes(&self, prefix: &'static str, bytes: &mut BytesMut) {
-        if !bytes.is_empty() {
-            debug!("{} {} {:?}", self.name, prefix, bytes.as_ref());
         }
     }
 }
@@ -37,7 +31,8 @@ impl Decoder for NetCodec {
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        self.log_bytes("unpack", src);
+        helpers::log_data(&self.name, "in", src);
+
         if self.header.is_none() && src.len() >= MBAP_HEADER_LEN {
             let header = HeaderCodec::default().decode(src)?.unwrap();
             self.header = Some(header);
@@ -75,7 +70,8 @@ impl Encoder<ResponseFrame> for NetCodec {
 
         dst.unsplit(body);
 
-        self.log_bytes("pack", dst);
+        helpers::log_data(&self.name, "out", dst);
+
         Ok(())
     }
 }
