@@ -33,7 +33,7 @@ impl UdpServer {
     pub async fn build(settings: Settings) -> Result<Handler, Error> {
         let address = settings.address.get();
         let socket = UdpSocket::bind(address).await?;
-        let codec = UdpCodec::new("udp");
+        let codec = UdpCodec::new(address);
         let io = UdpFramed::new(socket, codec);
 
         let (tx, rx) = mpsc::channel(settings.nmsg);
