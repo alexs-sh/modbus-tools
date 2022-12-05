@@ -158,6 +158,21 @@ impl RequestPdu {
             RequestPdu::Raw { data, .. } => 1 + data.len(),
         }
     }
+
+    pub fn func(&self) -> Option<u8> {
+        match self {
+            RequestPdu::ReadCoils { .. } => Some(0x1),
+            RequestPdu::ReadDiscreteInputs { .. } => Some(0x2),
+            RequestPdu::ReadHoldingRegisters { .. } => Some(0x3),
+            RequestPdu::ReadInputRegisters { .. } => Some(0x4),
+            RequestPdu::WriteSingleCoil { .. } => Some(0x5),
+            RequestPdu::WriteSingleRegister { .. } => Some(0x6),
+            RequestPdu::WriteMultipleCoils { .. } => Some(0xF),
+            RequestPdu::WriteMultipleRegisters { .. } => Some(0x10),
+            RequestPdu::EncapsulatedInterfaceTransport { .. } => Some(0x2b),
+            RequestPdu::Raw { function, .. } => Some(*function),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

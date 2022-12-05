@@ -2,7 +2,8 @@
 members = [
     "core/frame",
     "core/codec",
-    "tools/slave-rnd"
+    "tools/slave-rnd",
+    "tools/slave-exchange"
 ]
 
 [profile.release]
