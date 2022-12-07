@@ -5,18 +5,18 @@
     * [slave-exchange](#tools-slave-exchange)
 * [Implementation details](#implementation-details)
 * [Cross compile](#cross-compile)
+* [Online examples](#online-examples)
 
 <a name="about"></a>
 ## About
-
-Tool(s) for working with Modbus protocol. They are written in Rust / Tokio /
-Async.
 
 [![Build Status](https://gitlab.com/alexssh/modbus-tools/badges/master/pipeline.svg)](https://gitlab.com/alexssh/modbus-tools/-/commits/master)
 [![Coverage](https://gitlab.com/alexssh/modbus-tools/badges/master/coverage.svg)](https://gitlab.com/alexssh/modbus-tools/-/commits/master)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Latest Release](https://gitlab.com/alexssh/modbus-tools/-/badges/release.svg)](https://gitlab.com/alexssh/modbus-tools/-/releases)
 
+Tools for working with Modbus protocol powered by Rust/Tokio. Apps are available
+online. See [here](#online-examples) for details.
 
 <a name="tools"></a>
 ## Tools
@@ -142,3 +142,11 @@ cargo build --target=armv7-unknown-linux-gnueabihf
 ```
 cargo build --release --target=x86_64-pc-windows-gnu
 ```
+
+<a name="online-examples"></a>
+## Online examples
+
+slave-rnd - 194.60.201.127:502. TCP and UDP transport is enabled. 
+
+slave-exchange - 194.60.201.127:1502. TCP and UDP transport is enabled. 
+
