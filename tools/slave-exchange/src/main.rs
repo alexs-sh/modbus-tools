@@ -186,15 +186,12 @@ impl Memory {
     }
 }
 
-fn read_args() -> Option<Settings> {
-    let arg: String = env::args().skip(1).take(1).collect();
-
-    if arg == "--help" || arg == "-h" {
-        println!(
-            r#"slave-exchange [address]
+fn usage() {
+    println!(
+        r#"slave-exchange [addresses]
 
 Parameters:
-    address - optional parameter for binding server socket. 0.0.0.0:502 by default
+    addresses - One or more addresses on which application should work
 
 Env. variables:
     RUST_LOG - changes output verbosity. Values [error,warn,info,debug,trace]. info by default
@@ -206,17 +203,22 @@ Examples:
 
     slave-exchange tcp:0.0.0.0:8888 - run app on port 8888. TCP mode.
 
-    slave-exchange udp:0.0.0.0:8888 - run app on port 8888. UDP mode.
+    slave-exchange tcp:0.0.0.0:1502 udp:0.0.0.0:1502 serial:/dev/ttyUSB0:9600-8-N-1 - run app on TCP/UDP ports #1502 and serial port /dev/ttyUSB0
     "#
-        );
-        None
-    } else {
-        let mut settings = Settings::default();
-        if !arg.is_empty() {
-            settings.address = TransportAddress::from_str(&arg).unwrap();
+    );
+}
+
+fn read_args() -> Vec<Settings> {
+    env::args().skip(1).fold(Vec::new(), |mut acc, rec| {
+        if let Ok(address) = TransportAddress::from_str(&rec) {
+            let settings = Settings {
+                address,
+                ..Default::default()
+            };
+            acc.push(settings);
         }
-        Some(settings)
-    }
+        acc
+    })
 }
 
 async fn wait_ctrl_c() {
@@ -241,16 +243,25 @@ fn init_memory() -> Arc<Mutex<Memory>> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    if let Some(settings) = read_args() {
-        init_logger();
+    init_logger();
+
+    let settings = read_args();
+
+    if settings.is_empty() {
+        usage();
+    } else {
         let memory = init_memory();
-        builder::build_slave(settings, move |request| {
-            let mut locked = memory.lock().unwrap();
-            let answer = locked.process(&request.payload);
-            Response::make(request, answer).try_send();
-        })
-        .await?;
+        for record in settings {
+            let local = memory.clone();
+            builder::build_slave(record, move |request| {
+                let mut locked = local.lock().unwrap();
+                let answer = locked.process(&request.payload);
+                Response::make(request, answer).try_send();
+            })
+            .await?;
+        }
         wait_ctrl_c().await;
     }
+
     Ok(())
 }

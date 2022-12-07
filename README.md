@@ -79,10 +79,12 @@ connecting different components of a system.
 Running:
 
 ```
-cargo run --bin slave-exchange tcp:0.0.0.0:1502
+cargo run --bin slave-exchange tcp:0.0.0.0:1502 udp:0.0.0.0:1502 serial:/dev/ttyUSB0:9600-8-N-1
 ..
-[2022-12-06T05:30:18Z INFO  transport::builder] start tcp server 0.0.0.0:1502
-[2022-12-06T05:30:18Z INFO  slave_exchange] press Ctrl+C to exit
+[2022-12-07T19:43:18Z INFO  transport::builder] start tcp server 0.0.0.0:1502
+[2022-12-07T19:43:18Z INFO  transport::builder] start udp server 0.0.0.0:1502
+[2022-12-07T19:43:18Z INFO  transport::builder] start rtu slave /dev/ttyUSB0:9600-8-N-1
+[2022-12-07T19:43:18Z INFO  slave_exchange] press Ctrl+C to exit
 ```
 
 <a name="implementation-details"></a>
