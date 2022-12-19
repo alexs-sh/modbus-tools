@@ -105,16 +105,13 @@ impl RtuSlaveChannel {
             response_tx: Some(self.response_tx.clone()),
         };
 
-        helpers::log_frame(&self.name, &uuid, &request);
-
+        helpers::log_message(&self.name, &request);
         let _ = self.request_tx.send(request).await;
     }
 
     async fn send_response(&mut self, response: Response) {
+        helpers::log_message(&self.name, &response);
         let frame = ResponseFrame::from_parts(0, response.slave, response.pdu);
-
-        helpers::log_frame(&self.name, &response.uuid, &frame);
-
         let _ = self.io.send(frame).await;
     }
 }

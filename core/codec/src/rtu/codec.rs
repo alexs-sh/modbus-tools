@@ -108,7 +108,7 @@ impl Decoder for RtuCodec {
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        helpers::log_data(&self.name, "in", src);
+        helpers::log_data(&self.name, "input", src);
 
         if self.slave.is_none() {
             self.start_crc();
@@ -159,7 +159,7 @@ impl Encoder<ResponseFrame> for RtuCodec {
         dst.unsplit(body);
         dst.unsplit(crc);
 
-        helpers::log_data(&self.name, "out", dst);
+        helpers::log_data(&self.name, "output", dst);
 
         result
     }

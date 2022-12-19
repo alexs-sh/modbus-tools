@@ -95,13 +95,13 @@ impl UdpServer {
             pdu: request.pdu,
             response_tx: Some(self.response_tx.clone()),
         };
-        helpers::log_frame(&address, &uuid, &request);
+        helpers::log_message(&address, &request);
         let _ = self.request_tx.send(request).await;
     }
 
     async fn send_response(&mut self, response: Response) {
         if let Some(info) = self.queue.take_if(|rec| rec.uuid == response.uuid) {
-            helpers::log_frame(&info.address, &response.uuid, &response);
+            helpers::log_message(&info.address, &response);
             let id = info.mbid;
             let response = ResponseFrame::from_parts(id, response.slave, response.pdu);
             let _ = self.io.send((response, info.address)).await;

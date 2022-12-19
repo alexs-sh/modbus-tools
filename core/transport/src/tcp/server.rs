@@ -70,12 +70,11 @@ impl Client {
             .wait_for
             .as_ref()
             .map_or(false, |info| info.uuid == response.uuid);
+
         if resp_match {
             let info = self.wait_for.take().unwrap();
+            helpers::log_message(&self.address, &response);
             let response = ResponseFrame::from_parts(info.mbid, response.slave, response.pdu);
-
-            helpers::log_frame(&self.address, &info.uuid, &response);
-
             let _ = self.io.send(response).await;
         } else {
             warn!("invalid/expired uuid:{}", response.uuid);
@@ -92,7 +91,7 @@ impl Client {
             response_tx: Some(self.response_tx.clone()),
         };
 
-        helpers::log_frame(&self.address, &uuid, &request);
+        helpers::log_message(&self.address, &request);
 
         let _ = self.request_tx.send(request).await;
         if self.wait_for.is_some() {

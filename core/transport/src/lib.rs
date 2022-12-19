@@ -6,6 +6,7 @@ pub mod udp;
 
 use frame::{RequestPdu, ResponsePdu};
 use futures::Stream;
+use std::fmt;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
@@ -24,6 +25,18 @@ pub struct Response {
     pub slave: u8,
     pub pdu: ResponsePdu,
     response_tx: Option<mpsc::Sender<Response>>,
+}
+
+impl fmt::Display for Response {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} slave:{} pdu:{:?}", self.uuid, self.slave, self.pdu)
+    }
+}
+
+impl fmt::Display for Request {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} slave:{} pdu:{:?}", self.uuid, self.slave, self.pdu)
+    }
 }
 
 impl Response {

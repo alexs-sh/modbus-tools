@@ -31,7 +31,7 @@ impl Decoder for NetCodec {
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        helpers::log_data(&self.name, "in", src);
+        helpers::log_data(&self.name, "input", src);
 
         if self.header.is_none() && src.len() >= MBAP_HEADER_LEN {
             let header = HeaderCodec::default().decode(src)?.unwrap();
@@ -70,7 +70,7 @@ impl Encoder<ResponseFrame> for NetCodec {
 
         dst.unsplit(body);
 
-        helpers::log_data(&self.name, "out", dst);
+        helpers::log_data(&self.name, "output", dst);
 
         Ok(())
     }
