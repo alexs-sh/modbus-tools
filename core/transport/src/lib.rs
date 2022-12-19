@@ -4,7 +4,7 @@ pub mod settings;
 pub mod tcp;
 pub mod udp;
 
-use frame::{RequestFrame, ResponseFrame};
+use frame::{RequestPdu, ResponsePdu};
 use futures::Stream;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -13,22 +13,25 @@ use uuid::Uuid;
 #[derive(Debug)]
 pub struct Request {
     pub uuid: Uuid,
-    pub payload: RequestFrame,
+    pub slave: u8,
+    pub pdu: RequestPdu,
     pub response_tx: Option<mpsc::Sender<Response>>,
 }
 
 #[derive(Debug)]
 pub struct Response {
     pub uuid: Uuid,
-    pub payload: ResponseFrame,
+    pub slave: u8,
+    pub pdu: ResponsePdu,
     response_tx: Option<mpsc::Sender<Response>>,
 }
 
 impl Response {
-    pub fn make(mut request: Request, response: ResponseFrame) -> Response {
+    pub fn make(mut request: Request, response: ResponsePdu) -> Response {
         Response {
             uuid: request.uuid,
-            payload: response,
+            slave: request.slave,
+            pdu: response,
             response_tx: request.response_tx.take(),
         }
     }

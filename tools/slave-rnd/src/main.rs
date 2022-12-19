@@ -3,7 +3,7 @@ extern crate transport;
 
 use env_logger::Builder;
 use frame::exception::Code;
-use frame::{RequestFrame, RequestPdu, ResponseFrame, ResponsePdu, MAX_NCOILS, MAX_NREGS};
+use frame::{RequestPdu, ResponsePdu, MAX_NCOILS, MAX_NREGS};
 use log::{info, LevelFilter};
 use tokio::signal;
 
@@ -11,7 +11,7 @@ use rand::Rng;
 use std::env;
 use std::str::FromStr;
 use transport::builder;
-use transport::{settings::Settings, settings::TransportAddress, Response};
+use transport::{settings::Settings, settings::TransportAddress, Request, Response};
 
 fn fill_registers(registers: &mut [u16]) {
     for item in registers.iter_mut() {
@@ -25,7 +25,7 @@ fn fill_coils(coils: &mut [bool]) {
     }
 }
 
-fn make_answer(request: &RequestFrame) -> ResponseFrame {
+fn make_answer(request: Request) -> Response {
     let mut registers = [0u16; MAX_NREGS];
     let mut coils = [false; MAX_NCOILS];
     let pdu = match &request.pdu {
@@ -86,7 +86,7 @@ fn make_answer(request: &RequestFrame) -> ResponseFrame {
         }
     };
 
-    ResponseFrame::new(request.slave, pdu)
+    Response::make(request, pdu)
 }
 
 fn read_args() -> Option<Settings> {
@@ -143,8 +143,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(settings) = read_args() {
         init_logger();
         builder::build_slave(settings, |request| {
-            let answer = make_answer(&request.payload);
-            Response::make(request, answer).try_send();
+            make_answer(request).try_send();
         })
         .await?;
         wait_ctrl_c().await;

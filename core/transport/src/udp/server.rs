@@ -91,19 +91,19 @@ impl UdpServer {
 
         let request = Request {
             uuid,
-            payload: request,
+            slave: request.slave,
+            pdu: request.pdu,
             response_tx: Some(self.response_tx.clone()),
         };
-        helpers::log_frame(&address, &uuid, &request.payload);
+        helpers::log_frame(&address, &uuid, &request);
         let _ = self.request_tx.send(request).await;
     }
 
     async fn send_response(&mut self, response: Response) {
         if let Some(info) = self.queue.take_if(|rec| rec.uuid == response.uuid) {
-            helpers::log_frame(&info.address, &response.uuid, &response.payload);
+            helpers::log_frame(&info.address, &response.uuid, &response);
             let id = info.mbid;
-            let response =
-                ResponseFrame::from_parts(id, response.payload.slave, response.payload.pdu);
+            let response = ResponseFrame::from_parts(id, response.slave, response.pdu);
             let _ = self.io.send((response, info.address)).await;
         } else {
             warn!("invalid/expired uuid:{}", response.uuid);

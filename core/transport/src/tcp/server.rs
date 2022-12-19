@@ -72,11 +72,9 @@ impl Client {
             .map_or(false, |info| info.uuid == response.uuid);
         if resp_match {
             let info = self.wait_for.take().unwrap();
+            let response = ResponseFrame::from_parts(info.mbid, response.slave, response.pdu);
 
-            helpers::log_frame(&self.address, &response.uuid, &response.payload);
-
-            let response =
-                ResponseFrame::from_parts(info.mbid, response.payload.slave, response.payload.pdu);
+            helpers::log_frame(&self.address, &info.uuid, &response);
 
             let _ = self.io.send(response).await;
         } else {
@@ -89,11 +87,12 @@ impl Client {
         let mbid = request.id;
         let request = Request {
             uuid,
-            payload: request,
+            slave: request.slave,
+            pdu: request.pdu,
             response_tx: Some(self.response_tx.clone()),
         };
 
-        helpers::log_frame(&self.address, &uuid, &request.payload);
+        helpers::log_frame(&self.address, &uuid, &request);
 
         let _ = self.request_tx.send(request).await;
         if self.wait_for.is_some() {

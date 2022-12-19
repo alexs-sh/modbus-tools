@@ -3,9 +3,7 @@ extern crate transport;
 
 use env_logger::Builder;
 use frame::exception::Code;
-use frame::{
-    data::Data, RequestFrame, RequestPdu, ResponseFrame, ResponsePdu, MAX_NCOILS, MAX_NREGS,
-};
+use frame::{data::Data, RequestPdu, ResponsePdu, MAX_NCOILS, MAX_NREGS};
 use log::{info, LevelFilter};
 use tokio::signal;
 
@@ -13,7 +11,7 @@ use std::env;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use transport::builder;
-use transport::{settings::Settings, settings::TransportAddress, Response};
+use transport::{settings::Settings, settings::TransportAddress, Request, Response};
 
 #[derive(PartialEq, Eq, Hash)]
 struct Address {
@@ -85,7 +83,7 @@ impl Memory {
         count
     }
 
-    pub fn process(&mut self, request: &RequestFrame) -> ResponseFrame {
+    pub fn process(&mut self, request: Request) -> Response {
         let slave = request.slave;
         let func = request.pdu.func().unwrap();
         let mut coils = [false; MAX_NCOILS];
@@ -176,7 +174,7 @@ impl Memory {
             },
         };
 
-        ResponseFrame::from_parts(request.id, request.slave, pdu)
+        Response::make(request, pdu)
     }
 
     pub fn new() -> Memory {
@@ -255,8 +253,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let local = memory.clone();
             builder::build_slave(record, move |request| {
                 let mut locked = local.lock().unwrap();
-                let answer = locked.process(&request.payload);
-                Response::make(request, answer).try_send();
+                locked.process(request).try_send();
             })
             .await?;
         }
