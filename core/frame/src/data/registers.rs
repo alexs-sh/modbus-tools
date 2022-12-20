@@ -70,7 +70,7 @@ impl<'a, 'b> RegistersCursorBe<'a, 'b> {
 
 impl<'a, 'b> Registers for RegistersCursorBe<'a, 'b> {
     fn registers_write(&self, dst: &mut [u8]) -> u16 {
-        let slen = common::nregs_len(self.nobjs as u16);
+        let slen = common::nregs_len(self.nobjs);
         let dlen = dst.len();
         let nobj = (std::cmp::min(slen, dlen) / 2) as u16;
         let mut dst = Cursor::new(dst);

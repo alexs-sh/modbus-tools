@@ -38,7 +38,7 @@ fn make_answer(request: Request) -> Response {
         RequestPdu::ReadDiscreteInputs { nobjs, .. } => {
             let nobjs = *nobjs as usize;
             fill_coils(&mut coils[0..nobjs]);
-            ResponsePdu::read_discrete_inputs(&coils[0..nobjs as usize])
+            ResponsePdu::read_discrete_inputs(&coils[0..nobjs])
         }
 
         RequestPdu::ReadHoldingRegisters { nobjs, .. } => {
@@ -50,7 +50,7 @@ fn make_answer(request: Request) -> Response {
         RequestPdu::ReadInputRegisters { nobjs, .. } => {
             let nobjs = *nobjs as usize;
             fill_registers(&mut registers[0..nobjs]);
-            ResponsePdu::read_input_registers(&registers[0..nobjs as usize])
+            ResponsePdu::read_input_registers(&registers[0..nobjs])
         }
 
         RequestPdu::WriteSingleCoil { address, value } => {

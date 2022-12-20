@@ -21,7 +21,7 @@ pub fn nregs_check(nobjs: u16) -> bool {
 }
 
 pub fn data_bytes_check(nobjs: usize) -> bool {
-    nobjs > 0 && nobjs as usize <= MAX_DATA_SIZE
+    nobjs > 0 && nobjs <= MAX_DATA_SIZE
 }
 
 pub fn bits_from_bytes(bytes: &[u8], nbits: usize) -> Vec<bool> {

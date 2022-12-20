@@ -111,11 +111,10 @@ impl DataStorage {
     }
 
     fn registers_empty(nobjs: u16) -> DataStorage {
-        assert!(common::nregs_check(nobjs as u16));
-
+        assert!(common::nregs_check(nobjs));
         let len = common::nregs_len(nobjs);
         let mut buffer = SmallVec::<[u8; MAX_DATA_SIZE]>::new();
-        buffer.resize(len as usize, 0);
+        buffer.resize(len, 0);
         DataStorage { buffer }
     }
 
@@ -124,7 +123,7 @@ impl DataStorage {
 
         let len = common::ncoils_len(nobjs);
         let mut buffer = SmallVec::<[u8; MAX_DATA_SIZE]>::new();
-        buffer.resize(len as usize, 0);
+        buffer.resize(len, 0);
         DataStorage { buffer }
     }
 }

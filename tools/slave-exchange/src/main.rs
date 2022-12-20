@@ -142,8 +142,8 @@ impl Memory {
                 data,
             } => {
                 let count = *nobjs as usize;
-                for i in 0..count {
-                    coils[i] = data.get_bit(i).unwrap();
+                for (i, value) in coils.iter_mut().take(count).enumerate() {
+                    *value = data.get_bit(i).unwrap();
                 }
                 self.write_coils(slave, 0x1, *address, &coils[..count]);
                 ResponsePdu::WriteMultipleCoils {
@@ -158,8 +158,8 @@ impl Memory {
                 data,
             } => {
                 let count = *nobjs as usize;
-                for i in 0..count {
-                    regs[i] = data.get_u16(i).unwrap();
+                for (i, value) in regs.iter_mut().take(count).enumerate() {
+                    *value = data.get_u16(i).unwrap();
                 }
                 self.write_registers(slave, 0x3, *address, &regs[..count]);
                 ResponsePdu::WriteMultipleRegisters {

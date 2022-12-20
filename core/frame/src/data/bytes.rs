@@ -45,7 +45,7 @@ impl<'a, 'b> Bytes for BytesCursor<'a, 'b> {
         let slen = self.nobjs as usize;
         let dlen = dst.len();
         let len = std::cmp::min(slen, dlen);
-        assert!(common::data_bytes_check(len as usize));
+        assert!(common::data_bytes_check(len));
 
         let mut inner = self.inner.borrow_mut();
         for b in dst.iter_mut().take(len) {

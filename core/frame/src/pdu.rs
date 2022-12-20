@@ -113,7 +113,7 @@ impl RequestPdu {
 
     /// 0x10
     pub fn write_multiple_registers(address: u16, registers: impl Registers) -> RequestPdu {
-        let nobjs = registers.registers_count() as u16;
+        let nobjs = registers.registers_count();
         assert!(common::nregs_check(nobjs));
         RequestPdu::WriteMultipleRegisters {
             address,
