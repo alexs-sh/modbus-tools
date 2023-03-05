@@ -1,17 +1,16 @@
-extern crate frame;
-extern crate transport;
+use modbus::data::prelude::*;
+use modbus::frame::exception::Code;
+use modbus::frame::prelude::*;
+use modbus::transport::builder;
+use modbus::transport::prelude::*;
 
 use env_logger::Builder;
-use frame::exception::Code;
-use frame::{RequestPdu, ResponsePdu, MAX_NCOILS, MAX_NREGS};
 use log::{info, LevelFilter};
 use tokio::signal;
 
 use rand::Rng;
 use std::env;
 use std::str::FromStr;
-use transport::builder;
-use transport::{settings::Settings, settings::TransportAddress, Request, Response};
 
 fn fill_registers(registers: &mut [u16]) {
     for item in registers.iter_mut() {
@@ -143,7 +142,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(settings) = read_args() {
         init_logger();
         builder::build_slave(settings, |request| {
-            make_answer(request).try_send();
+            make_answer(request).send();
         })
         .await?;
         wait_ctrl_c().await;

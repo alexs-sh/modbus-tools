@@ -1,7 +1,5 @@
 [workspace]
 members = [
-    "core/frame",
-    "core/codec",
     "tools/slave-rnd",
     "tools/slave-exchange"
 ]

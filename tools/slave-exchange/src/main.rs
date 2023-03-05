@@ -1,17 +1,15 @@
-extern crate frame;
-extern crate transport;
-
 use env_logger::Builder;
-use frame::exception::Code;
-use frame::{data::Data, RequestPdu, ResponsePdu, MAX_NCOILS, MAX_NREGS};
+use modbus::data::prelude::*;
+use modbus::frame::prelude::*;
+use modbus::transport::builder;
+use modbus::transport::prelude::*;
+
 use log::{info, LevelFilter};
 use tokio::signal;
 
 use std::env;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use transport::builder;
-use transport::{settings::Settings, settings::TransportAddress, Request, Response};
 
 #[derive(PartialEq, Eq, Hash)]
 struct Address {
@@ -170,7 +168,7 @@ impl Memory {
 
             _ => ResponsePdu::Exception {
                 function: func,
-                code: Code::IllegalFunction,
+                code: ExceptionCode::IllegalFunction,
             },
         };
 
@@ -209,10 +207,7 @@ Examples:
 fn read_args() -> Vec<Settings> {
     env::args().skip(1).fold(Vec::new(), |mut acc, rec| {
         if let Ok(address) = TransportAddress::from_str(&rec) {
-            let settings = Settings {
-                address,
-                ..Default::default()
-            };
+            let settings = Settings { address };
             acc.push(settings);
         }
         acc
@@ -253,7 +248,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let local = memory.clone();
             builder::build_slave(record, move |request| {
                 let mut locked = local.lock().unwrap();
-                locked.process(request).try_send();
+                locked.process(request).send();
             })
             .await?;
         }
