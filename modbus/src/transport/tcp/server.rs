@@ -59,7 +59,6 @@ impl Client {
 
                     Ok(Ok(0)) => {
                         // close socket
-                        EventLog::info(&self.address, &"close");
                         Err(Error::new(ErrorKind::Other, "close"))
                     },
                     Ok(Ok(_nbytes)) =>
