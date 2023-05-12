@@ -4,7 +4,7 @@ use modbus::frame::prelude::*;
 use modbus::transport::builder;
 use modbus::transport::prelude::*;
 
-use log::{info, LevelFilter};
+use log::{info, warn, LevelFilter};
 use tokio::signal;
 
 use std::env;
@@ -248,7 +248,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let local = memory.clone();
             builder::build_slave(record, move |request| {
                 let mut locked = local.lock().unwrap();
-                locked.process(request).send();
+                let _ = locked.process(request).send().map_err(|e| warn!("{:?}", e));
             })
             .await?;
         }

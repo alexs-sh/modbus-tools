@@ -60,8 +60,13 @@ impl Response {
         }
     }
 
-    pub fn send(mut self) {
-        self.response_tx.take().unwrap().send(self).unwrap();
+    pub fn send(mut self) -> std::io::Result<()> {
+        self.response_tx.take().unwrap().send(self).map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotConnected,
+                "can't send answer. Channel closed?",
+            )
+        })
     }
 }
 

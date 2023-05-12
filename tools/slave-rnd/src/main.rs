@@ -5,7 +5,7 @@ use modbus::transport::builder;
 use modbus::transport::prelude::*;
 
 use env_logger::Builder;
-use log::{info, LevelFilter};
+use log::{info, warn, LevelFilter};
 use tokio::signal;
 
 use rand::Rng;
@@ -142,7 +142,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(settings) = read_args() {
         init_logger();
         builder::build_slave(settings, |request| {
-            make_answer(request).send();
+            let _ = make_answer(request).send().map_err(|e| warn!("{:?}", e));
         })
         .await?;
         wait_ctrl_c().await;
