@@ -78,7 +78,7 @@ coverage:
   stage: analyze
   needs: [format]
   before_script:
-    - curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-x86_64-unknown-linux-gnu.tar.bz2 | tar jxf -
+    - curl -L https://github.com/mozilla/grcov/releases/download/v0.8.12/grcov-x86_64-unknown-linux-gnu.tar.bz2 | tar jxf -
   script:
     - export RUSTFLAGS="-Cinstrument-coverage"
     - export LLVM_PROFILE_FILE="reports-%p-%m.profraw"
