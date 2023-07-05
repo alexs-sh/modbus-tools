@@ -109,6 +109,8 @@ Examples:
     slave-rnd tcp:0.0.0.0:8888 - run app on port 8888. TCP mode.
 
     slave-rnd udp:0.0.0.0:8888 - run app on port 8888. UDP mode.
+
+    slave-rnd serial:/dev/ttyUSB0:19200-8-E-1 - run app on serial port. RTU mode.
     "#
         );
         None
