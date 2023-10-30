@@ -124,19 +124,16 @@ Examples:
 }
 
 async fn wait_ctrl_c() {
-    info!("press Ctrl+C to exit");
-    let stop = signal::ctrl_c();
-    tokio::select! {
-        _ = stop => {
-            info!("stopping...")
-    }};
+    info!("press ctrl+c to exit");
+    let _ = signal::ctrl_c().await;
+    info!("stopping...");
 }
 
 fn init_logger() {
-    let mut builder = Builder::new();
-    builder.filter_level(LevelFilter::Info);
-    builder.parse_default_env();
-    builder.init();
+    Builder::new()
+        .filter_level(LevelFilter::Info)
+        .parse_default_env()
+        .init();
 }
 
 #[tokio::main]
