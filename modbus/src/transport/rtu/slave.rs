@@ -100,7 +100,9 @@ impl RtuSlaveChannel {
 
     async fn on_input(&mut self) -> Result<(), Error> {
         EventLog::input(&self.name, &self.context.input);
-        let Some(request) = self.context.decode()? else { return Ok(()) };
+        let Some(request) = self.context.decode()? else {
+            return Ok(());
+        };
         self.on_request(request).await;
         Ok(())
     }

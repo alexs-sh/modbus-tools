@@ -92,7 +92,9 @@ impl UdpServer {
 
     async fn on_input(&mut self, address: SocketAddr) -> Result<(), Error> {
         EventLog::input(&address, &self.context.input);
-        let Some(request) = self.context.decode()? else { return Ok(()) };
+        let Some(request) = self.context.decode()? else {
+            return Ok(());
+        };
         self.on_request(address, request).await;
         Ok(())
     }
@@ -122,10 +124,13 @@ impl UdpServer {
     }
 
     async fn on_response(&mut self, response: Option<Response>) -> Result<(), Error> {
-        let Some(response) = response else { return Ok(()) };
+        let Some(response) = response else {
+            return Ok(());
+        };
         let Some(info) = self.queue.take_if(|rec| rec.uuid == response.uuid) else {
             EventLog::warning(&response.uuid, &"uuid is missing/expired");
-            return Ok(()) };
+            return Ok(());
+        };
 
         EventLog::response(&info.address, &response);
         let frame = ResponseFrame::from_parts(info.mbid, response.slave, response.pdu);

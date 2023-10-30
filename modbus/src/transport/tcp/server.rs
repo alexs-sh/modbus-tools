@@ -81,7 +81,9 @@ impl Client {
 
     async fn on_input(&mut self) -> Result<(), Error> {
         EventLog::input(&self.address, &self.context.input);
-        let Some(request) = self.context.decode()? else { return Ok(()) };
+        let Some(request) = self.context.decode()? else {
+            return Ok(());
+        };
         self.on_request(request).await;
         Ok(())
     }
@@ -111,7 +113,9 @@ impl Client {
     }
 
     async fn on_response(&mut self, response: Option<Response>) -> Result<(), Error> {
-        let Some(response) = response else { return Ok(()); };
+        let Some(response) = response else {
+            return Ok(());
+        };
         let resp_match = self
             .wait_for
             .as_ref()
