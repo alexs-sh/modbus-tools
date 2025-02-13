@@ -146,7 +146,7 @@ cargo build --release --target=x86_64-pc-windows-gnu
 <a name="online-examples"></a>
 ## Online examples
 
-slave-rnd - 194.60.201.127:502. TCP and UDP transport is enabled. 
+slave-rnd - 173.212.202.137:502. TCP and UDP transport is enabled.
 
-slave-exchange - 194.60.201.127:1502. TCP and UDP transport is enabled. 
+slave-exchange - 173.212.202.137:1502. TCP and UDP transport is enabled.
 
