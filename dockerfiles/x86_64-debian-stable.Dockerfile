@@ -1,4 +1,4 @@
-FROM debian:11
+FROM debian:stable
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN apt update -y && apt install -y gcc curl bzip2 lcov
