@@ -9,11 +9,9 @@
 
 <a name="about"></a>
 ## About
-
-[![Build Status](https://gitlab.com/alexssh/modbus-tools/badges/master/pipeline.svg)](https://gitlab.com/alexssh/modbus-tools/-/commits/master)
-[![Coverage](https://gitlab.com/alexssh/modbus-tools/badges/master/coverage.svg)](https://gitlab.com/alexssh/modbus-tools/-/commits/master)
+[![Build Status](https://gitlab.com/alexs-sh/modbus-tools/badges/master/pipeline.svg)](https://gitlab.com/alexs-sh/modbus-tools/-/commits/master)
+[![Coverage](https://gitlab.com/alexs-sh/modbus-tools/badges/master/coverage.svg)](https://gitlab.com/alexs-sh/modbus-tools/-/commits/master)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Latest Release](https://gitlab.com/alexssh/modbus-tools/-/badges/release.svg)](https://gitlab.com/alexssh/modbus-tools/-/releases)
 
 Tools for working with Modbus protocol powered by Rust/Tokio. Apps are available
 online. See [here](#online-examples) for details.
